@@ -1,0 +1,22 @@
+# Scala
+*.class
+*.log
+
+# SBT
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE
+.scala_dependencies
+.worksheet
+
+# ENSIME
+.ensime_cache/
+.ensime

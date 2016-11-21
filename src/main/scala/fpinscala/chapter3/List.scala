@@ -58,4 +58,16 @@ object List {
     case Cons(_, Nil) => Nil
     case Cons(x, xs) => Cons(x, init(xs))
   }
+
+  def foldRight[A, B](as: List[A], z: B)(f: (A, B) => B): B = as match {
+    case Nil => z
+    case Cons(x, xs) => f(x, foldRight(xs, z)(f))
+  }
+
+  // Exercise 3.7
+  // Using foldRight it is not possible to short circuit the product algorithm when encountering 0.
+  // This is because foldRight evaluates all the arguments before calling the product function on them.
+
+  // Exercise 3.8
+  // Using foldRight like this foldRight(Cons(1, Cons(2, Cons(3, Nil))), Nil:List[Int])(Cons(_,_)) we get back the original list. Nil becomes z, the default base and Cons is the f used to combine all the original list elements
 }

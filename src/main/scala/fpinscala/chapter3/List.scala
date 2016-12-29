@@ -88,4 +88,11 @@ object List {
 
   // Exercise 3.12
   def reverse[A](as: List[A]): List[A] = foldLeft(as, Nil:List[A])((acc, h) => Cons(h, acc))
+
+  // Exercise 3.13
+  def foldRightWithFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B) =
+    foldLeft(reverse(as), z)((b, a) => f(a, b))
+
+  def foldLeftWithFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B) =
+    foldRight(as, (b:B) => b)((a, g) => b => g(f(b, a)))(z)
 }

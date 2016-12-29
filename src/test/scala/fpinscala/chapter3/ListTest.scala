@@ -72,4 +72,8 @@ class ListTest extends FlatSpec with Matchers {
   "Function reverse" should "return the reverse of a list" in {
     reverse(List(1, 2, 3, 4, 5)) should be (List(5, 4, 3, 2, 1))
   }
+
+  "Function foldRightWithFoldLeft" should "return the same result of foldRight" in {
+    foldRightWithFoldLeft(List(1, 2, 3), 0)((x, y) => x + y) should be (foldRight(List(1, 2, 3), 0)((x, y) => x + y))
+  }
 }

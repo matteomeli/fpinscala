@@ -90,9 +90,18 @@ object List {
   def reverse[A](as: List[A]): List[A] = foldLeft(as, Nil:List[A])((acc, h) => Cons(h, acc))
 
   // Exercise 3.13
-  def foldRightWithFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B) =
+  def foldRightWithFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B): B =
     foldLeft(reverse(as), z)((b, a) => f(a, b))
 
-  def foldLeftWithFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B) =
+  def foldLeftWithFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B): B =
     foldRight(as, (b:B) => b)((a, g) => b => g(f(b, a)))(z)
+
+  // Exercise 3.14
+  def append[A](as: List[A], a: A): List[A] = appendViaFoldRight(as, List(a))
+  def append[A](l: List[A], r: List[A]): List[A] = appendViaFoldRight(l, r)
+  def appendViaFoldRight[A](l: List[A], r: List[A]): List[A] = foldRight(l, r)(Cons(_, _))
+  def appendViaFoldLeft[A](l: List[A], r: List[A]): List[A] = foldLeft(reverse(l), r)((acc, h) => Cons(h, acc))
+
+  // Exercise 3.15
+  def flatten[A](l: List[List[A]]): List[A] = foldRight(l, Nil:List[A])(append)
 }

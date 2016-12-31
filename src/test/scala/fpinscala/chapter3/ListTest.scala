@@ -76,4 +76,14 @@ class ListTest extends FlatSpec with Matchers {
   "Function foldRightWithFoldLeft" should "return the same result of foldRight" in {
     foldRightWithFoldLeft(List(1, 2, 3), 0)((x, y) => x + y) should be (foldRight(List(1, 2, 3), 0)((x, y) => x + y))
   }
+
+  "Function append" should "return a list of elements plus the new one appended at the end" in {
+    append(List(1, 2, 3), 4) should be (List(1, 2, 3, 4))
+    appendViaFoldRight(List(1, 2, 3), List(4)) should be (append(List(1, 2, 3), 4))
+    appendViaFoldLeft(List(1, 2, 3), List(4)) should be (appendViaFoldRight(List(1, 2, 3), List(4)))
+  }
+
+  "Function flatten" should "concatenate a list of lists in a single list" in {
+    flatten(List(List(1, 2), List(3, 4), List(5, 6))) should be (List(1, 2, 3, 4, 5, 6))
+  }
 }

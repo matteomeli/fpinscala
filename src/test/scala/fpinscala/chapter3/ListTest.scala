@@ -86,4 +86,9 @@ class ListTest extends FlatSpec with Matchers {
   "Function flatten" should "concatenate a list of lists in a single list" in {
     flatten(List(List(1, 2), List(3, 4), List(5, 6))) should be (List(1, 2, 3, 4, 5, 6))
   }
+
+  "Function addOne" should "add 1 to each element of a list of integers" in {
+    addOne(List(1, 2, 3)) should be (List(2, 3, 4))
+    addOne(List()) should be (List())
+  }
 }

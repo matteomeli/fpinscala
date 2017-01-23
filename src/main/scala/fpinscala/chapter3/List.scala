@@ -104,4 +104,12 @@ object List {
 
   // Exercise 3.15
   def flatten[A](l: List[List[A]]): List[A] = foldRight(l, Nil:List[A])(append)
+
+  // Exercise 3.16
+  def addOne(l: List[Int]): List[Int] = l match {
+    case Nil => Nil
+    case Cons(h, tail) => Cons((h + 1), addOne(tail))
+  }
+
+  def addOneWithFoldRight(l: List[Int]): List[Int] = foldRight(l, Nil:List[Int])((h, t) => Cons(h + 1, t))
 }

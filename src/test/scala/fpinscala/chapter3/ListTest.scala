@@ -12,7 +12,7 @@ class ListTest extends FlatSpec with Matchers {
     }
   }
 
-  "Function setHead" should "return a new list with the updated head" in {
+  "Function setHead" should "return a new list Via the updated head" in {
     setHead(List(1, 2, 3, 4, 5), 0) should be (List(0, 2, 3, 4, 5))
 
     assertThrows [NoSuchElementException] {
@@ -20,7 +20,7 @@ class ListTest extends FlatSpec with Matchers {
     }
   }
 
-  "Function drop" should "return a list without the first n elements" in {
+  "Function drop" should "return a list Viaout the first n elements" in {
     drop(List(1, 2, 3, 4, 5), 2) should be (List(3, 4, 5))
 
     drop(List(1), 1) should be (List())
@@ -28,7 +28,7 @@ class ListTest extends FlatSpec with Matchers {
     drop(List(1, 2, 3, 4, 5), 6) should be (List())
   }
 
-  "Function dropWhile" should "return a list without the first elements that match the given predicate" in {
+  "Function dropWhile" should "return a list Viaout the first elements that match the given predicate" in {
     val lessThanFour = (x: Int) => x < 4
     dropWhile(List(1, 2, 3, 4, 5), lessThanFour) should be (List(4, 5))
 
@@ -39,7 +39,7 @@ class ListTest extends FlatSpec with Matchers {
     dropWhile(List(1, 2, 3, 4, 5), lessOrEqualThanFive) should be (List())
   }
 
-  "Function init" should "return a list with all its elements but the last" in {
+  "Function init" should "return a list Via all its elements but the last" in {
     init(List(1, 2, 3, 4, 5)) should be (List(1, 2, 3, 4))
 
     init(List(1)) should be (List())
@@ -73,8 +73,8 @@ class ListTest extends FlatSpec with Matchers {
     reverse(List(1, 2, 3, 4, 5)) should be (List(5, 4, 3, 2, 1))
   }
 
-  "Function foldRightWithFoldLeft" should "return the same result of foldRight" in {
-    foldRightWithFoldLeft(List(1, 2, 3), 0)((x, y) => x + y) should be (foldRight(List(1, 2, 3), 0)((x, y) => x + y))
+  "Function foldRightViaFoldLeft" should "return the same result of foldRight" in {
+    foldRightViaFoldLeft(List(1, 2, 3), 0)((x, y) => x + y) should be (foldRight(List(1, 2, 3), 0)((x, y) => x + y))
   }
 
   "Function append" should "return a list of elements plus the new one appended at the end" in {
@@ -90,5 +90,19 @@ class ListTest extends FlatSpec with Matchers {
   "Function addOne" should "add 1 to each element of a list of integers" in {
     addOne(List(1, 2, 3)) should be (List(2, 3, 4))
     addOne(List()) should be (List())
+  }
+
+  "Function doublesToStrings" should "transform each value in a list of doubles into a string" in {
+    doublesToStrings(List(1.0, 2.0, 3.0)) should be (List("1.0", "2.0", "3.0"))
+  }
+
+  "Function map" should "modify each element of a list while mantaining the structure of the list" in {
+    val l = List(1.0, 2.0, 3.0)
+    map(l)(_.toString) should be (doublesToStrings(l))
+    map(l)(_ + 1) should be (List(2.0, 3.0, 4.0))
+  }
+
+  "Function filter" should "remove all the elements from a list unless they satisfy the given procedure" in {
+    filter(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))(_ % 2 == 0) should be (List(0, 2, 4, 6, 8))
   }
 }

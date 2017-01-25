@@ -52,11 +52,32 @@ object List {
   }
 
   // Exercise 3.6
-  // TODO: Come back when reverse fn is available and write this to be tailrec accumulating the new list in reverse order and then reverse it in the end
   def init[A](l: List[A]): List[A] = l match {
     case Nil => throw new NoSuchElementException("init of empty list")
     case Cons(_, Nil) => Nil
     case Cons(x, xs) => Cons(x, init(xs))
+  }
+
+  /*
+   * Besides being inefficient, the above natural recursive solution for init() will use a stack frame for each element
+   * of the list, which can lead to stack overflows for large lists (can you see why?).  lists, it's common to use
+   * a temporary, mutable buffer internal to the function ( lazy lists or streams, which we discuss in chapter 5,
+   * we don't normally do this). So long as the buffer is allocated internal to the function, the mutation is not
+   * observable and RT (referential transparency) is preserved.
+   *
+   * Another common convention is to accumulate the output list in reverse order, then reverse it at the end, which
+   * doesn't require even local mutation. We'll write a reverse function later in this chapter.
+   */
+  def init2[A](l: List[A]): List[A] = {
+    import collection.mutable.ListBuffer
+    val buf = new ListBuffer[A]
+    @annotation.tailrec
+    def go(cur: List[A]): List[A] = cur match {
+      case Nil => sys.error("init of empty list")
+      case Cons(_,Nil) => List(buf.toList: _*)
+      case Cons(h,t) => buf += h; go(t)
+    }
+    go(l)
   }
 
   def foldRight[A, B](as: List[A], z: B)(f: (A, B) => B): B = as match {
@@ -90,10 +111,13 @@ object List {
   def reverse[A](as: List[A]): List[A] = foldLeft(as, Nil:List[A])((acc, h) => Cons(h, acc))
 
   // Exercise 3.13
-  def foldRightWithFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B): B =
+  def foldRightViaFoldLeft[A, B](as: List[A], z: B)(f: (A, B) => B): B =
     foldLeft(reverse(as), z)((b, a) => f(a, b))
 
-  def foldLeftWithFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B): B =
+  def foldRightViaFoldLeftAlternative[A,B](l: List[A], z: B)(f: (A,B) => B): B =
+    foldLeft(l, (b:B) => b)((g,a) => b => g(f(a,b)))(z)
+
+  def foldLeftViaFoldRight[A, B](as: List[A], z: B)(f: (B, A) => B): B =
     foldRight(as, (b:B) => b)((a, g) => b => g(f(b, a)))(z)
 
   // Exercise 3.14
@@ -111,5 +135,40 @@ object List {
     case Cons(h, tail) => Cons((h + 1), addOne(tail))
   }
 
-  def addOneWithFoldRight(l: List[Int]): List[Int] = foldRight(l, Nil:List[Int])((h, t) => Cons(h + 1, t))
+  def addOneViaFoldRight(l: List[Int]): List[Int] = foldRight(l, Nil:List[Int])((h, t) => Cons(h + 1, t))
+
+  // Exercise 3.17
+  def doublesToStrings(l: List[Double]): List[String] = foldRight(l, Nil:List[String])((h, t) => Cons(h.toString, t))
+
+  // Exercise 3.18
+  def map[A, B](as: List[A])(f: A => B): List[B] = foldRight(as, Nil:List[B])((h, t) => Cons(f(h), t))
+
+  def mapStackSafe[A, B](as: List[A])(f: A => B): List[B] = foldRightViaFoldLeft(as, Nil:List[B])((h, t) => Cons(f(h), t))
+
+  // Implementation using local mutation (variation 2).
+  // Note the mutation isn't observable outside the function, since we're only mutating a buffer that we've allocated.
+  def mapVithLocalMutation[A,B](l: List[A])(f: A => B): List[B] = {
+    val buf = new collection.mutable.ListBuffer[B]
+    def go(l: List[A]): Unit = l match {
+      case Nil => ()
+      case Cons(h,t) => buf += f(h); go(t)
+    }
+    go(l)
+    List(buf.toList: _*) // converting from the standard Scala list to the list we've defined here
+  }
+
+  // Exercise 3.19
+  def filter[A](as: List[A])(f: A => Boolean): List[A] = foldRight(as, Nil:List[A])((h, t) => if (f(h)) Cons(h, t) else t)
+
+  def filterStackSafe[A](as: List[A])(f: A => Boolean): List[A] = foldRightViaFoldLeft(as, Nil:List[A])((h, t) => if (f(h)) Cons(h, t) else t)
+
+  def filterWithLocalMutation[A](l: List[A])(f: A => Boolean): List[A] = {
+    val buf = new collection.mutable.ListBuffer[A]
+    def go(l: List[A]): Unit = l match {
+      case Nil => ()
+      case Cons(h,t) => if (f(h)) buf += h; go(t)
+    }
+    go(l)
+    List(buf.toList: _*) // converting from the standard Scala list to the list we've defined here
+  }
 }

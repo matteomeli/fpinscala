@@ -105,4 +105,24 @@ class ListTest extends FlatSpec with Matchers {
   "Function filter" should "remove all the elements from a list unless they satisfy the given procedure" in {
     filter(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))(_ % 2 == 0) should be (List(0, 2, 4, 6, 8))
   }
+
+  "Function flatMap" should "work like map except the input function returnsa list" in {
+    flatMap(List(1, 2, 3))(i => List(i, i)) should be (List(1, 1, 2, 2, 3, 3))
+  }
+
+  "Function filterViaFlatMap" should "behave like filter" in {
+    val l = List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    val even = (n : Int) => n % 2 == 0
+    filterViaFlatMap(l)(even) should be (filter(l)(even))
+  }
+
+  "Function addPairs" should "take two lists and construct a new list by adding correspondent elements" in {
+    addPairs(List(1, 2, 3), List(4, 5, 6)) should be (List(5, 7, 9))
+    addPairs(List(1, 2), List(4, 5, 6)) should be (List(5, 7))
+  }
+
+  "Function zipWith" should "take two lists and a function and construct a new list by applying the function pairwise" in {
+    zipWith(List(4, 2, 5, 6), List(2, 6, 2, 3))(_ + _) should be (List(6, 8, 7, 9))
+    zipWith(List(1, 2, 3, 4), List("one", "two", "three", "four"))((_, _)) should be (List((1, "one"), (2, "two"), (3, "three"), (4, "four"))) 
+  }
 }

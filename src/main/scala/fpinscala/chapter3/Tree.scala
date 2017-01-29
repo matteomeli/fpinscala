@@ -30,9 +30,9 @@ object Tree {
   }
 
   // Exercise 3.28
-  def fold[A, B](tree: Tree[A])(lf: A => B)(bf: (B, B) => B): B = tree match {
-    case Leaf(a) => lf(a)
-    case Branch(l, r) => bf(fold(l)(lf)(bf), fold(r)(lf)(bf))
+  def fold[A, B](tree: Tree[A])(f: A => B)(g: (B, B) => B): B = tree match {
+    case Leaf(a) => f(a)
+    case Branch(l, r) => g(fold(l)(f)(g), fold(r)(f)(g))
   }
 
   /*

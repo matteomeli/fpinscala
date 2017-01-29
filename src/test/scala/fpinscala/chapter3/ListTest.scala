@@ -1,6 +1,6 @@
 import org.scalatest._
 
-import fpinscala.chapter3.List
+import fpinscala.chapter3.{List, Nil}
 import List._
 
 class ListTest extends FlatSpec with Matchers {
@@ -123,6 +123,15 @@ class ListTest extends FlatSpec with Matchers {
 
   "Function zipWith" should "take two lists and a function and construct a new list by applying the function pairwise" in {
     zipWith(List(4, 2, 5, 6), List(2, 6, 2, 3))(_ + _) should be (List(6, 8, 7, 9))
-    zipWith(List(1, 2, 3, 4), List("one", "two", "three", "four"))((_, _)) should be (List((1, "one"), (2, "two"), (3, "three"), (4, "four"))) 
+    zipWith(List(1, 2, 3, 4), List("one", "two", "three", "four"))((_, _)) should be (List((1, "one"), (2, "two"), (3, "three"), (4, "four")))
+  }
+
+  "Function hasSubsequence" should "take return true if a list contains another list" in {
+    hasSubsequence(List(1, 2, 3, 4), List(1, 2)) should be (true)
+    hasSubsequence(List(1, 2, 3, 4), List(2, 3)) should be (true)
+    hasSubsequence(List(1, 2, 3, 4), Nil:List[Int]) should be (true)
+    hasSubsequence(List(1, 2, 3, 4), List(5, 6)) should be (false)
+    hasSubsequence(Nil, List(5, 6)) should be (false)
+    hasSubsequence(Nil, Nil) should be (true)
   }
 }

@@ -19,4 +19,14 @@ class TreeTest extends FlatSpec with Matchers {
   "Function map" should "modify each element mantaining the tree structure" in {
     map(Branch(Branch(Leaf(0), Leaf(1)), Branch(Leaf(2), Leaf(3))))(_.toString) should be (Branch(Branch(Leaf("0"), Leaf("1")), Branch(Leaf("2"), Leaf("3"))))
   }
+
+  "Function fold" should "generalise other functions on trees" in {
+    fold(Branch(Leaf(1), Leaf(2)))(_ => 1)(1 + _ + _) should be (Tree.size(Branch(Leaf(1), Leaf(2))))
+
+    fold(Branch(Leaf(1), Leaf(2)))(identity)(_ max _) should be (maximum(Branch(Leaf(1), Leaf(2))))
+
+    fold(Branch(Leaf(1), Leaf(2)))(_ => 0)((x, y) => 1 + x max y) should be (depth(Branch(Leaf(1), Leaf(2))))
+
+    mapViaFold(Branch(Leaf(1), Leaf(2)))(_.toString) should be (map(Branch(Leaf(1), Leaf(2)))(_.toString))
+  }
 }

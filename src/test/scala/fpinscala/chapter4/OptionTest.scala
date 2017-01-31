@@ -10,6 +10,11 @@ class OptionTest extends FlatSpec with Matchers {
     n map(_ + 1) should be (None)
   }
 
+  "Function getOrElse" should "return a default value is an Option is None" in {
+    None getOrElse(2) should be (2)
+    Some(1) getOrElse(2) should be (1)
+  }
+
   // TODO: Implement tests for basic Option's functions
 
   // TODO: Test variance function

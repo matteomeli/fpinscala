@@ -1,7 +1,7 @@
 package fpinscala.chapter4
 
-//hide std library `Option` and `Either`, since we are writing our own in this chapter
-import scala.{Option => _, Either => _, _}
+// Hide std library `Option`
+import scala.{Option => _}
 
 sealed trait Option[+A] {
   // Exercise 4.1
@@ -72,4 +72,15 @@ object Option {
 
   def sequence3[A](as: List[Option[A]]): Option[List[A]] =
     as.foldRight[Option[List[A]]](Some(Nil))((x, y) => map2(x, y)(_ :: _))
+
+  // Exercise 4.5
+  def traverse[A, B](as: List[A])(f: A => Option[B]): Option[List[B]] =
+    as.foldRight[Option[List[B]]](Some(Nil))((x, y) => map2(f(x), y)(_ :: _))
+
+  def traverse2[A, B](as: List[A])(f: A => Option[B]): Option[List[B]] = as match {
+    case Nil => Some(Nil)
+    case h :: t => map2(f(h), traverse(t)(f))(_ :: _)
+  }
+
+  def sequenceViaTraverse[A](as: List[Option[A]]): Option[List[A]] = traverse(as)(identity)
 }

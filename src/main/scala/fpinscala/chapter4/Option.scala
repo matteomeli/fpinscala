@@ -61,16 +61,12 @@ object Option {
     a flatMap(x => b map(y => f(x, y)))
 
   // Exercise 4.4
-  def sequence[A](as: List[Option[A]]): Option[List[A]] =
-    if (as.exists(_ == None)) None
-    else Some(as map { case Some(a) => a }) // This assumes the input to the map will never be None
-
-  def sequence2[A](as: List[Option[A]]): Option[List[A]] = as match {
+  def sequence[A](as: List[Option[A]]): Option[List[A]] = as match {
     case Nil => Some(Nil)
     case h :: t => h flatMap (hh => sequence2(t) map (hh :: _))
   }
 
-  def sequence3[A](as: List[Option[A]]): Option[List[A]] =
+  def sequence2[A](as: List[Option[A]]): Option[List[A]] =
     as.foldRight[Option[List[A]]](Some(Nil))((x, y) => map2(x, y)(_ :: _))
 
   // Exercise 4.5

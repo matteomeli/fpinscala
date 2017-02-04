@@ -22,6 +22,20 @@ sealed trait Either[+E, +A] {
 
   def map2[EE >: E, B, C](b: Either[EE, B])(f: (A, B) => C): Either[EE, C] =
     this flatMap(aa => b map(bb => f(aa, bb)))
+
+  // Exercise 4.7
+  def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] = es match {
+    case Nil => Right(Nil)
+    case h :: t => h flatMap (hh => sequence(t) map (hh :: _))
+  }
+
+  def sequence2[E, A](es: List[Either[E, A]]): Either[E, List[A]] =
+    es.foldRight[Either[E, List[A]]](Right(Nil))((x, y) => x.map2(y)(_ :: _))
+
+  def traverse[E, A, B](es: List[A])(f: A => Either[E, B]): Either[E, List[B]] =
+    es.foldRight[Either[E, List[B]]](Right(Nil))((x, y) => f(x).map2(y)(_ :: _))
+
+  def sequenceViaTraverse[E, A](es: List[Either[E, A]]): Either[E, List[A]] = traverse(es)(x => x)
 }
 
 case class Left[+E](value: E) extends Either[E, Nothing]

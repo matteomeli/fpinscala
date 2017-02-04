@@ -95,6 +95,66 @@ sealed trait Stream[+A] {
 
   def flatMap[B](f: A => Stream[B]): Stream[B] =
     foldRight(empty: Stream[B])((h, t) => f(h) append t)
+
+  // Exercise 5.13
+  def mapViaUnfold[B](f: A => B): Stream[B] =
+    unfold(this){
+      case Cons(h, t) => Some((f(h()), t()))
+      case Empty => None
+    }
+
+  def takeViaUnfold(n: Int): Stream[A] =
+    unfold((n, this)){
+      case (1, Cons(h, t)) => Some((h(), (0, empty)))
+      case (n, Cons(h, t)) if n > 1 => Some((h(), (n-1, t())))
+      case _ => None
+    }
+
+  def takeWhileViaUnfold(p: A => Boolean): Stream[A] =
+    unfold(this){
+      case Cons(h, t) if p(h()) => Some((h(), t()))
+      case _ => None
+    }
+
+  def zipWith[B, C](s: Stream[B])(f: (A, B) => C): Stream[C] =
+    unfold((this, s)){
+      case (Cons(h1, t1), Cons(h2, t2)) => Some((f(h1(), h2()), (t1(), t2())))
+      case _ => None
+    }
+
+  def zip[B](s: Stream[B]): Stream[(A, B)] = zipWith(s)((_, _))
+
+  def zipAll[B](s: Stream[B]): Stream[(Option[A], Option[B])] = zipWithAll(s)((_, _))
+
+  def zipWithAll[B, C](s: Stream[B])(f: (Option[A], Option[B]) => C): Stream[C] =
+    unfold((this, s)){
+      case (Cons(h1, t1), Cons(h2, t2)) => Some(f(Some(h1()), Some(h2())), (t1(), t2()))
+      case (Empty, Cons(h, t)) => Some(f(None, Some(h())), (empty, t()))
+      case (Cons(h, t), Empty) => Some(f(Some(h()), None), (t(), empty))
+      case _ => None
+    }
+
+  // Exercise 5.14
+  def startsWith[A](s: Stream[A]): Boolean =
+    zipAll(s).takeWhile(!_._2.isEmpty) forAll { case (x, y) => x == y }
+
+  // Exercise 5.15
+  def tails: Stream[Stream[A]] =
+    unfold(this){
+      case Empty => None
+      case s => Some((s, s drop 1))
+    } append Stream(empty)
+
+  def hasSubsequence[A](s: Stream[A]): Boolean =
+    tails exists (_ startsWith s)
+
+  // Exercise 5.16
+  def scanRight[B](z: B)(f: (A, => B) => B): Stream[B] =
+    foldRight((z, Stream(z)))((a, acc) => {
+      lazy val lacc = acc
+      val b = f(a, lacc._1)
+      (b, cons(b, lacc._2))
+    })._2
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]

@@ -3,19 +3,19 @@ package fpinscala.chapter6
 // Exercise 6.10
 case class State[S, +A](run: S => (A, S)) {
   def map[B](f: A => B): State[S, B] = State(s => {
-    val (a, s2) = run(s)
-    (f(a), s2)
+    val (a, s2) = run(s)  // Execute this action
+    (f(a), s2)            // Apply f to the result of this action
   })
 
   def map2[B, C](sb: State[S, B])(f: (A, B) => C): State[S, C] = State(s => {
-    val (a, s2) = run(s)
-    val (b, s3) = sb.run(s2)
-    (f( a, b), s3)
+    val (a, s2) = run(s)      // Apply this action
+    val (b, s3) = sb.run(s2)  // Apply sb's action with state resulting of this action
+    (f( a, b), s3)            // Apply f to the intermediate result of both actions
   })
 
   def flatMap[B](g: A => State[S, B]): State[S, B] = State(s => {
-    val (a, s2) = run(s)
-    g(a).run(s2)
+    val (a, s2) = run(s)  // Execute this action
+    g(a).run(s2)  // Execute the action created by applying to the result of this action
   })
 
   def mapViaFlatMap[B](f: A => B): State[S, B] =

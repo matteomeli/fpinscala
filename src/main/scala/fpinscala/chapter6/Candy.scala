@@ -18,9 +18,13 @@ object Candy {
     }
 
   def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = for {
+    // Transform the inputs into a list of "modify" actions
+    // to sequentially "update" a "Machine" and sequence it
     _ <- State.sequence(inputs map (State.modify[Machine] _ compose update))
+    // Extract the final state
     s <- State.get
-  } yield (s.coins, s.candies)
+  } yield (s.coins, s.candies)  // Map final state S (=> Machine)
+                                // to desired A (=> Int, Int) in State[S, A]
 
   def simulateMachine2(inputs: List[Input]): State[Machine, (Int, Int)] =
     State.sequence(inputs map (State.modify[Machine] _ compose update)).flatMap(_ =>

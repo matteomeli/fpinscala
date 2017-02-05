@@ -16,6 +16,7 @@ case class State[S, +A](run: S => (A, S)) {
   def flatMap[B](g: A => State[S, B]): State[S, B] = State(s => {
     val (a, s2) = run(s)  // Execute this action
     g(a).run(s2)          // Execute the action created by applying g to the result of this action
+                          // using the state resulting from previous execution of this action
   })
 
   def mapViaFlatMap[B](f: A => B): State[S, B] =

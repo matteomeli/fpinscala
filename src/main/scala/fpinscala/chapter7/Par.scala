@@ -111,7 +111,59 @@ object Par {
     map(sequence(fbs))(_.flatten) // flatten called on a List[Option[A]] will remove None values
   }
 
-  // Define traverse?
+  def delay[A](fa: => Par[A]): Par[A] = es => fa(es)
+
+  // TODO: Define traverse?
+
+  def equal[A](e: ExecutorService)(p: Par[A], q: Par[A]): Boolean =
+    p(e).get == q(e).get
+
+  def choice[A](cond: Par[Boolean])(tf: Par[A], ff: Par[A]): Par[A] =
+    es =>
+      if (run(es)(cond).get) tf(es)
+      else ff(es)
+
+  // Exercise 7.11
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    es => run(es)(choices(run(es)(n).get))
+
+  def choiceViaChoiceN[A](cond: Par[Boolean])(tf: Par[A], ff: Par[A]): Par[A] =
+    choiceN(map(cond)(b => if (b) 0 else 1))(List(tf, ff))
+
+  // Exercise 7.12
+  def choiceMap[K, V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] =
+    es => {
+      val k = run(es)(key).get
+      run(es)(choices(k))
+    }
+
+  // Define as `chooser` in the exercises but this is actually our good old friend flatMap
+  def flatMap[A, B](pa: Par[A])(f: A => Par[B]): Par[B] =
+    es => {
+      val s = run(es)(pa).get
+      run(es)(f(s))
+    }
+
+  // Exercise 7.13
+  def choiceViaFlatMap[A](cond: Par[Boolean])(tf: Par[A], ff: Par[A]): Par[A] =
+    flatMap(cond)(a => if (a) tf else ff)
+
+  def choiceNViaFlatMap[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    flatMap(n)(i => choices(i))
+
+  def choiceViaFlatMap[K, V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] =
+    flatMap(key)(k => choices(k))
+
+  // Exercise 7.14
+  // This would be the equivalent of a flatten kind function for Lists
+  def join[A](a: Par[Par[A]]): Par[A] =
+    es => run(es)(run(es)(a).get())
+
+  def joinViaFlatMap[A](fa: Par[Par[A]]): Par[A] =
+    flatMap(fa)(identity)
+
+  def flatMapViaJoin[A, B](pa: Par[A])(f: A => Par[B]): Par[B] =
+    join(map(pa)(f))
 
   def sum(ints: IndexedSeq[Int]): Par[Int] =
     if (ints.length <= 1)

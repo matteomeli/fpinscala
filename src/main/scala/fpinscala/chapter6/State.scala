@@ -10,7 +10,7 @@ case class State[S, +A](run: S => (A, S)) {
   def map2[B, C](sb: State[S, B])(f: (A, B) => C): State[S, C] = State(s => {
     val (a, s2) = run(s)      // Apply this action
     val (b, s3) = sb.run(s2)  // Apply sb's action with state resulting of this action
-    (f( a, b), s3)            // Apply f to the intermediate result of both actions
+    (f(a, b), s3)            // Apply f to the intermediate result of both actions
   })
 
   def flatMap[B](g: A => State[S, B]): State[S, B] = State(s => {

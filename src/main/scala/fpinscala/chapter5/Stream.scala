@@ -155,6 +155,12 @@ sealed trait Stream[+A] {
       val b = f(a, lacc._1)
       (b, cons(b, lacc._2))
     })._2
+
+  @annotation.tailrec
+  final def find(f: A => Boolean): Option[A] = this match {
+    case Empty => None
+    case Cons(h, t) => if (f(h())) Some(h()) else t().find(f)
+  }
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]

@@ -1,18 +1,72 @@
 package fpinscala.chapter8
 
+import fpinscala.chapter5.Stream
 import fpinscala.chapter6.{RNG, State}
+import Prop._
 
-trait Prop {
-  def check: Boolean
+sealed trait Result {
+  def hasFailed: Boolean
+}
+
+case object Passed extends Result {
+  def hasFailed = false
+}
+
+case class Failed(failure: FailedCase, successess: SuccessCount) extends Result {
+  def hasFailed = true
+}
+
+case class Prop(run: (TestCases, RNG) => Result) {
+  // Does not owrk with successive refinement of Prop
+  //def check: Boolean
 
   // Exercise 8.3
-  def &&(p: Prop): Prop = new Prop {
-    def check = Prop.this.check && p.check
+  // Does not owrk with successive refinement of Prop
+  //def &&(p: Prop): Prop = new Prop {
+  //  def check = Prop.this.check && p.check
+  //}
+
+  // Exercise 8.9
+  def &&(p: Prop): Prop = Prop {
+    (n, rng) => run(n, rng) match {
+      case Passed => p.run(n, rng)
+      case x => x
+    }
+  }
+
+  def ||(p: Prop): Prop = Prop {
+    (n, rng) => run(n, rng) match {
+      case Failed(msg, _) => p.tag(msg).run(n, rng)
+      case x => x
+    }
+  }
+
+  def tag(msg: String): Prop = Prop {
+    (n, rng) => run(n, rng) match {
+      case Failed(e, c) => Failed(msg + "\n" + e, c)
+      case x => x
+    }
   }
 }
 
 object Prop {
-  def forAll[A](ga: Gen[A])(pf: A => Boolean): Prop = ???
+  type FailedCase = String
+  type SuccessCount = Int
+  type TestCases = Int
+
+  def forAll[A](ga: Gen[A])(pf: A => Boolean): Prop = Prop {
+    (n, rng) => randomStream(ga)(rng).zip(Stream.from(0)).take(n).map {
+      case (a, i) => try {
+        if (pf(a)) Passed else Failed(a.toString, i)
+      } catch { case e: Exception => Failed(buildMsg(a, e), i) }
+    }.find(_.hasFailed).getOrElse(Passed)
+  }
+  def randomStream[A](g: Gen[A])(rng: RNG): Stream[A] =
+    Stream.unfold(rng)(rng => Some(g.sample.run(rng)))
+  def buildMsg[A](s: A, e: Exception): String =
+    s"test case: $s\n" +
+    s"generated an exception: ${e.getMessage}\n" +
+    s"stack trace:\n ${e.getStackTrace.mkString("\n")}"
 }
 
 case class Gen[A](sample: State[RNG, A]) {

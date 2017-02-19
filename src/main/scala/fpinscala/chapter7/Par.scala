@@ -118,6 +118,8 @@ object Par {
   def equal[A](e: ExecutorService)(p: Par[A], q: Par[A]): Boolean =
     p(e).get == q(e).get
 
+  def equal[A](p: Par[A], q: Par[A]): Par[Boolean] = Par.map2(p, q)(_ == _)
+
   def choice[A](cond: Par[Boolean])(tf: Par[A], ff: Par[A]): Par[A] =
     es =>
       if (run(es)(cond).get) tf(es)

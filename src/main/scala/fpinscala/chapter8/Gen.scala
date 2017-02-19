@@ -3,6 +3,12 @@ package fpinscala.chapter8
 import fpinscala.chapter5.Stream
 import fpinscala.chapter6.{RNG, State}
 import Prop._
+import fpinscala.chapter7.Par
+import fpinscala.chapter7.Par._
+
+import java.util.concurrent._
+
+import language.postfixOps
 
 sealed trait Result {
   def hasFailed: Boolean
@@ -14,6 +20,10 @@ case object Passed extends Result {
 
 case class Failed(failure: FailedCase, successess: SuccessCount) extends Result {
   def hasFailed = true
+}
+
+case object Proved extends Result {
+  def hasFailed = false
 }
 
 case class Prop(run: (MaxSize, TestCases, RNG) => Result) {
@@ -29,7 +39,7 @@ case class Prop(run: (MaxSize, TestCases, RNG) => Result) {
   // Exercise 8.9
   def &&(p: Prop): Prop = Prop {
     (m, n, rng) => run(m, n, rng) match {
-      case Passed => p.run(m, n, rng)
+      case Passed | Proved => p.run(m, n, rng)
       case x => x
     }
   }
@@ -87,7 +97,64 @@ object Prop {
     p.run(maxSize, testCases, rng) match {
       case Failed(msg, n) => println(s"! Failed after $n passed test(s):\n $msg")
       case Passed => println(s"+ OK, passed $testCases tests.")
+      case Proved => println(s"+ OK, proved proverty.")
     }
+
+  val ES: ExecutorService = Executors.newCachedThreadPool
+  val p1 = Prop.forAll(Gen.unit(Par.unit(1)))(i =>
+    Par.map(i)(_ + 1)(ES).get == Par.unit(2)(ES).get)
+
+  def check(p: => Boolean): Prop = Prop { (_, _, _) =>
+    if (p) Proved else Failed("()", 0)
+  }
+
+  val p2 = check {
+    val p = Par.map(Par.unit(1))(_ + 1)
+    val p2 = Par.unit(2)
+    p(ES).get == p2(ES).get
+  }
+
+  def equal[A](p: Par[A], q: Par[A]): Par[Boolean] =
+    Par.map2(p, q)(_ == _)
+
+  val p3 = check {
+    equal (
+      Par.map(Par.unit(1))(_ + 1),
+      Par.unit(2)
+    ) (ES) get
+  }
+
+  val S = Gen.weighted(Gen.choose(1, 4).map(Executors.newFixedThreadPool) -> .75, Gen.unit(Executors.newCachedThreadPool) -> .25)
+
+  def forAllPar[A](g: Gen[A])(f: A => Par[Boolean]): Prop =
+    forAll(S ** g) { case s ** a => f(a)(s).get }
+
+  val S2 = SGen { _ => S }
+
+  def forAllPar[A](g: SGen[A])(f: A => Par[Boolean]): Prop =
+    forAll(S2 ** g) { case s ** a => f(a)(s).get }
+
+  def checkPar(p: Par[Boolean]): Prop = forAllPar(Gen.unit(()))(_ => p)
+
+  val p4 = checkPar {
+    equal(Par.map(Par.unit(1))(_ + 1), Par.unit(2))
+  }
+
+  val pint = Gen.choose(0, 10) map (Par.unit(_))
+  val p5 = forAllPar(pint) { n => equal(Par.map(n)(y => y), n) }
+
+  // Exercise 8.16
+  /** A `Gen[Par[Int]]` generated from a list summation that spawns a new parallel
+  * computation for each element of the input list summed to produce the final 
+  * result. This is not the most compelling example, but it provides at least some 
+  * variation in structure to use for testing. 
+  */
+  val pint2: Gen[Par[Int]] = Gen.choose(-100,100).listOfN(Gen.choose(0,20)).map(l => 
+    l.foldLeft(Par.unit(0))((p, i) => 
+      Par.fork { Par.map2(p, Par.unit(i))(_ + _) }))
+  val p6 = forAllPar(pint2) { n => equal(Par.map(n)(y => y), n) }
+
+  val p7 = forAllPar(pint2) { n => equal(Par.fork(n), n) } tag "fork"
 }
 
 case class Gen[+A](sample: State[RNG, A]) {
@@ -109,6 +176,10 @@ case class Gen[+A](sample: State[RNG, A]) {
 
   // Exercise 8.10
   def unsized: SGen[A] = SGen(_ => this)
+
+  def map2[B, C](g: Gen[B])(f: (A, B) => C): Gen[C] = Gen(sample.map2(g.sample)(f))
+  
+  def **[B](g: Gen[B]): Gen[(A, B)] = (this map2 g)((_, _))
 }
 
 object Gen {
@@ -149,12 +220,17 @@ case class SGen[+A](g: Int => Gen[A]) {
   def map[B](f: A => B): SGen[B] = SGen { g(_) map f }
 
   def flatMap[B](f: A => SGen[B]): SGen[B] = SGen { n => g(n) flatMap { f(_).g(n) } }
+
+  def map2[B, C](g2: SGen[B])(f: (A, B) => C): SGen[C] = SGen { n => (g(n) map2 g2(n))(f) }
+
+  def **[B](g: SGen[B]): SGen[(A, B)] = (this map2 g)((_, _))
 }
 
 object SGen {
   // Exercise 8.12
   def listOf[A](g: Gen[A]): SGen[List[A]] = SGen { g.listOfN(_) }
 
+  // Exercise 8.13
   def listOf1[A](g: Gen[A]): SGen[List[A]] = SGen {n => g.listOfN(n max 1) }
 
   val smallInt = Gen.choose(-10, 10)
@@ -167,4 +243,23 @@ object SGen {
     val max = ns.max
     !ns.exists(_ > max)
   }
+
+  val listSortedProp = forAll(listOf(smallInt)) { ns =>
+    val sorted = ns.sorted
+    /**
+    ns match {
+      case List() | List(_) => sorted == ns
+      case _ =>
+        val (min, max) = (sorted.min, sorted.max)
+        min == sorted.head && max == sorted.last
+    }
+    */
+    (sorted.isEmpty || ns.tail.isEmpty || !sorted.zip(sorted.tail).exists {
+      case (a, b) => a > b
+    }) && !ns.exists(!sorted.contains(_)) && !sorted.exists(!ns.contains(_))
+  }
+}
+
+object ** {
+  def unapply[A, B](p: (A, B)) = Some(p)
 }

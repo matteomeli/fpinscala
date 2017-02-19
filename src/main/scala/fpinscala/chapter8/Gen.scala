@@ -154,7 +154,13 @@ object Prop {
       Par.fork { Par.map2(p, Par.unit(i))(_ + _) }))
   val p6 = forAllPar(pint2) { n => equal(Par.map(n)(y => y), n) }
 
+  // Exercise 8.17
   val p7 = forAllPar(pint2) { n => equal(Par.fork(n), n) } tag "fork"
+
+  // Exercise 8.18
+  // 1) list.takeWhile.length <= list.length
+  // 2) each element in list.takeWhile should be contained in list
+  // 3) list.takeWhile(f) ++ list.dropWhile(f) == list
 }
 
 case class Gen[+A](sample: State[RNG, A]) {

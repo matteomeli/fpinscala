@@ -15,14 +15,23 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def or[A](p1: Parser[A], p2: Parser[A]): Parser[A]
   def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]]
 
-  def zeroOrMore(c: Char): Parser[Int]
-  def oneOrMore(c: Char): Parser[Int]
-
   def many[A](p: Parser[A]): Parser[List[A]]
   def map[A, B](a: Parser[A])(f: A => B): Parser[B]
 
   def succeed[A](a: A): Parser[A] =
     string("") map (_ => a)
+
+  def slice[A](p: Parser[A]): Parser[String]
+
+  def flatMap[A, B](a: Parser[A])(f: A => Parser[B]): Parser[B]
+  def map2[A, B, C](p1: Parser[A], p2: Parser[B])(f: (A, B) => C): Parser[C] =
+    flatMap(p1)(a => map(p2)(b => f(a, b)))
+
+  def product[A, B](p1: Parser[A], p2: Parser[B]): Parser[(A, B)] =
+    map2(p1, p2)((_, _))
+
+  def many1[A](p: Parser[A]): Parser[List[A]] =
+    map2(p, many(p))(_ :: _)
 
   implicit def string(s: String): Parser[String]
   implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
@@ -33,6 +42,10 @@ trait Parsers[ParserError, Parser[+_]] { self =>
     def or[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def many: Parser[List[A]] = self.many(p)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
+    def slice: Parser[String] = self.slice(p)
+    def many1: Parser[List[A]] = self.many1(p)
+    def **[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
+    def product[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
   }
 
   object Laws {
@@ -48,17 +61,12 @@ trait Parsers[ParserError, Parser[+_]] { self =>
     run(listOfN(3, "ab" | "cad"))("cadabab") == Right("cadabab")
     run(listOfN(3, "ab" | "cad"))("ababab") == Right("ababab")
 
-    run(zeroOrMore('a'))("aa") == Right(2)
-    run(zeroOrMore('a'))("a") == Right(1)
-    run(zeroOrMore('a'))("") == Right(0)
-    run(zeroOrMore('a'))("b") == Right(0)
-    run(zeroOrMore('a'))("ba") == Right(0)
+    run(many(char('a')))("aaa") == Right(List('a', 'a', 'a'))
+    val numA: Parser[Int] = char('a').many.map(_.size)
+    run(numA)("aaa") == Right(3)
+    val oneOrMoreA: Parser[Int] = char('a').many1.slice.map(_.size)
 
-    run(oneOrMore('a'))("aa") == Right(2)
-    run(oneOrMore('a'))("a") == Right(1)
-    run(oneOrMore('a'))("") == Left("Expected one or more 'a'")
-    run(oneOrMore('a'))("b") == Left("Expected one or more 'a'")
-    run(oneOrMore('a'))("ba") == Left("Expected one or more 'a'")
+    val p: Parser[(Int, Int)] = char('a').many.slice.map(_.size) ** char('b').many1.slice.map(_.size)
 
     def equal[A](p1: Parser[A], p2: Parser[A])(in: Gen[String]): Prop =
       forAll(in)(s => run(p1)(s) == run(p2)(s))
@@ -71,4 +79,5 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   }
 }
 
-case class ParserError(error: String)
+
+case class ParserError(msg: String)

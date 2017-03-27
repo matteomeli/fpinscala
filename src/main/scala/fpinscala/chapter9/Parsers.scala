@@ -74,6 +74,14 @@ trait Parsers[ParserError, Parser[+_]] { self =>
     def mapLaw[A](p: Parser[A])(in: Gen[String]): Prop =
       equal(p, p.map(a => a))(in)
 
+    def unbiasL[A,B,C](p: ((A,B), C)): (A,B,C) = (p._1._1, p._1._2, p._2)
+    def unbiasR[A,B,C](p: (A, (B,C))): (A,B,C) = (p._1, p._2._1, p._2._2)
+
+    def productLaw[A, B, C](p1: Parser[A], p2: Parser[B], p3: Parser[C])(in: Gen[String]): Prop =
+      equal(product(p1, product(p2, p3)).map(unbiasR), product(product(p1, p2), p3).map(unbiasL))(in)
+
+    //pa.map(f) ** pb.map(g) == (p1 ** p2).map { case (a, b) => (f(a), g(b))}
+
     val i = 10
     run(succeed(i))("whatever") == Right(i)
   }

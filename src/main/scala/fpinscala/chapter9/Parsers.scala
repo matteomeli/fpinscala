@@ -10,14 +10,20 @@ import scala.util.matching.Regex
 
 trait Parsers[ParserError, Parser[+_]] { self =>
   def run[A](p: Parser[A])(input: String): Either[ParserError, A]
-  def char(c: Char): Parser[Char] =
-    string(c.toString) map (_.charAt(0))
+
+  implicit def string(s: String): Parser[String]
+  implicit def regex(r: Regex): Parser[String]
 
   def or[A](p1: Parser[A], p2: => Parser[A]): Parser[A]
 
-  implicit def string(s: String): Parser[String]
+  def slice[A](p: Parser[A]): Parser[String]
+
+  def flatMap[A, B](a: Parser[A])(f: A => Parser[B]): Parser[B]
+
   implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))  
+
+  def char(c: Char): Parser[Char] = string(c.toString) map (_.charAt(0))
 
   // Exercise 9.4
   def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] =
@@ -35,10 +41,6 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def succeed[A](a: A): Parser[A] =
     string("") map (_ => a)
 
-  def slice[A](p: Parser[A]): Parser[String]
-
-  def flatMap[A, B](a: Parser[A])(f: A => Parser[B]): Parser[B]
-
   // Exercise 9.1
   def map2[A, B, C](p1: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] =
     flatMap(p1)(a => map(p2)(b => f(a, b)))
@@ -52,8 +54,6 @@ trait Parsers[ParserError, Parser[+_]] { self =>
 
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
-
-  implicit def regex(r: Regex): Parser[String]
 
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)

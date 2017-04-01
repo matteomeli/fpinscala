@@ -7,21 +7,20 @@ import fpinscala.chapter8.Gen._
 import fpinscala.chapter8.Prop._
 
 import scala.util.matching.Regex
+import java.util.regex._
 
 trait Parsers[ParserError, Parser[+_]] { self =>
   def run[A](p: Parser[A])(input: String): Either[ParserError, A]
 
   implicit def string(s: String): Parser[String]
-  implicit def regex(r: Regex): Parser[String]
+  implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
+  implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))  
 
   def or[A](p1: Parser[A], p2: => Parser[A]): Parser[A]
 
   def slice[A](p: Parser[A]): Parser[String]
 
   def flatMap[A, B](a: Parser[A])(f: A => Parser[B]): Parser[B]
-
-  implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
-  implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))  
 
   def char(c: Char): Parser[Char] = string(c.toString) map (_.charAt(0))
 
@@ -55,20 +54,70 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
 
+  implicit def regex(r: Regex): Parser[String]
+
   def sequence[A](p: List[Parser[A]]): Parser[List[A]] =
     p.foldLeft(succeed(List[A]()))((acc, pa) => pa.map2(acc)(_ :: _))
 
+  def skipL[A, B](p: Parser[A], p2: => Parser[B]): Parser[B] =
+    map2(slice(p), p2)((_, b) => b)
+
+  def skipR[A, B](p: Parser[A], p2: => Parser[B]): Parser[A] =
+    map2(p, slice(p2))((a, _) => a)
+
+  def whitespace: Parser[String] = "\\s*".r
+
+  def token[A](p: Parser[A]): Parser[A] = p << whitespace
+  
+  def digits: Parser[String] = "\\d+".r
+
+  def consumeUntil(s: String): Parser[String] = (".*?" + Pattern.quote(s)).r
+
+  def quoted: Parser[String] = string("\"") >> consumeUntil("\"").map(_.dropRight(1))
+
+  def escapedQuoted: Parser[String] = token(quoted)
+
+  def doubleString: Parser[String] = token("[+-]?([0-9]*\\.)?[0-9]+([eE][+-]?[0-9]+)?".r)
+
+  def double: Parser[Double] = doubleString map (_.toDouble)
+
+  def separated[A, B](p1: Parser[A], p2: Parser[B]): Parser[List[A]] =
+    separated1(p1, p2) or succeed(List())
+
+  def separated1[A, B](p1: Parser[A], p2: Parser[B]): Parser[List[A]] =
+    map2(p1, (p2 >> p1) many)(_ :: _)
+
+  def surround[A, B, C](start: Parser[A], stop: Parser[B])(p: => Parser[C]): Parser[C] =
+    start >> p << stop
+
+  def eof: Parser[String] = "\\z".r
+
+  def root[A](p: Parser[A]) = p << eof
+
   case class ParserOps[A](p: Parser[A]) {
-    def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
-    def or[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
+    def |[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
+    def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
+
     def many: Parser[List[A]] = self.many(p)
-    def map[B](f: A => B): Parser[B] = self.map(p)(f)
-    def map2[B, C](p2: Parser[B])(f: (A, B) => C): Parser[C] = self.map2(p, p2)(f)
-    def slice: Parser[String] = self.slice(p)
     def many1: Parser[List[A]] = self.many1(p)
-    def **[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
-    def product[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
+
+    def slice: Parser[String] = self.slice(p)
+
+    def **[B](p2: => Parser[B]): Parser[(A, B)] = self.product(p, p2)
+    def product[B](p2: => Parser[B]): Parser[(A, B)] = self.product(p, p2)
+
+    def map[B](f: A => B): Parser[B] = self.map(p)(f)
+    def map2[B, C](p2: => Parser[B])(f: (A, B) => C): Parser[C] = self.map2(p, p2)(f)
     def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
+
+    def >>[B](p2: => Parser[B]): Parser[B] = self.skipL(p, p2)
+    def <<[B](p2: => Parser[B]): Parser[A] = self.skipR(p, p2)
+
+    def token: Parser[A] = self.token(p)
+
+    def separated1[B](p2: Parser[B]): Parser[List[A]] = self.separated1(p, p2)
+    def separatedBy[B](p2: Parser[B]): Parser[List[A]] = self.separated(p, p2)
+    def as[B](b: B): Parser[B] = self.map(self.slice(p))(_ => b)
   }
 
   object Laws {

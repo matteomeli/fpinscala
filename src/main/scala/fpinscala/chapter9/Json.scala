@@ -15,6 +15,7 @@ object JSON {
   // Exercise 9.9
   def jsonParser[Error, Parser[+_]](P: Parsers[Error, Parser]): Parser[JSON] = {
     import P._
+
     val spaces = char(' ').many.slice
     val quote = char('"') map (_.toString)
     val comma = char(',') map (_.toString)
@@ -24,8 +25,8 @@ object JSON {
     val startArray = char('[') map (_.toString)
     val endArray = char(']') map (_.toString)
     val letter = regex("[a-zA-Z]".r)
-    val digit = regex("\\d".r)
-    val whitespace = regex("\\s".r)
+    val digits = regex("\\d+".r)
+    val whitespace = regex("\\s*".r)
     val jnull: Parser[JSON] = string("null") map (_ => JNull)
     val jnumber: Parser[JSON] = regex("[+-]?((\\d+\\.?\\d*)|(\\.\\d+)".r) map (s => JNumber(s.toDouble)) // s.toDouble could throw an exception, it should be handle with a try
     val jstring: Parser[JSON] = quote ** letter.many.slice ** quote map { case ((_, s), _) => JString(s) }
@@ -34,7 +35,7 @@ object JSON {
     def jvalue: Parser[JSON] = literal or jarray or jobject
     def jarray: Parser[JSON] = {
       val empty = startArray.map2(endArray) { case _ => JArray(IndexedSeq()) }
-      empty or (jvalue.map2(comma)((v, c) => v).many.map2(jvalue)((vs, v) => v :: vs).map(vs => JArray(vs.toIndexedSeq)))
+      empty or (jvalue.map2(comma)((v, _) => v).many.map2(jvalue)((vs, v) => v :: vs).map(vs => JArray(vs.toIndexedSeq)))
     }
     def jobject: Parser[JSON] = {
       val empty = startObject.map2(endObject) { case _ => JObject(Map()) }
@@ -42,9 +43,31 @@ object JSON {
         val key: Parser[String] = quote ** letter.many.slice ** quote map { case ((_, s), _) => s }
         key.map2(colon)((k, c) => k) ** jvalue
       }
-      empty or (jKeyValuePair.map2(comma)((kvp, c) => kvp).many.map2(jKeyValuePair)((kvps, kvp) => kvp :: kvps).map(kvps => JObject(kvps.toMap))) // This will not handle duplicate keys properly
+      empty or (jKeyValuePair.map2(comma)((kvp, _) => kvp).many.map2(jKeyValuePair)((kvps, kvp) => kvp :: kvps).map(kvps => JObject(kvps.toMap))) // This will not handle duplicate keys properly
     }
     jarray or jobject
+  }
+
+  def jsonParser2[Error, Parser[+_]](P: Parsers[Error, Parser]): Parser[JSON] = {
+    import P.{string => _, _}
+
+    implicit def t(s: String): Parser[String] = token(P.string(s))
+    def jarray: Parser[JSON] = surround("[", "]"){
+      jvalue separatedBy "," map (vs => JArray(vs.toIndexedSeq))
+    }
+    def jKeyVal: Parser[(String, JSON)] = escapedQuoted ** (":" >> jvalue)
+    def jobject: Parser[JSON] = surround("{", "}"){
+      jKeyVal separatedBy "," map (kvs => JObject(kvs.toMap))
+    }
+    def jliteral: Parser[JSON] = {
+      "null".as(JNull) |
+      double.map(JNumber(_)) |
+      escapedQuoted.map(JString(_)) |
+      "true".as(JBool(true)) |
+      "false".as(JBool(false))
+    }
+    def jvalue: Parser[JSON] = jliteral | jarray | jobject
+    root(whitespace >> (jobject | jarray))
   }
 }
 

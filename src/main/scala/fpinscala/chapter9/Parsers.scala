@@ -55,6 +55,9 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
 
+  def sequence[A](p: List[Parser[A]]): Parser[List[A]] =
+    p.foldLeft(succeed(List[A]()))((acc, pa) => pa.map2(acc)(_ :: _))
+
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def or[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
@@ -114,6 +117,5 @@ trait Parsers[ParserError, Parser[+_]] { self =>
     } yield n
   }
 }
-
 
 case class ParserError(msg: String)

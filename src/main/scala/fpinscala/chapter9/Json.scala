@@ -99,4 +99,12 @@ object JSONExample extends App {
 """
 
   // TODO: Run parser
+  val P = fpinscala.chapter9.BasicParsers
+  import fpinscala.chapter9.BasicParser
+
+  def printResult[E](e: Either[E, JSON]) =
+    e.fold(println, println)
+
+  val json: BasicParser[JSON] = JSON.jsonParser2(P)
+  printResult { P.run(json)(jsonTxt) }
 }

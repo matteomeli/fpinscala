@@ -55,7 +55,7 @@ object BasicParsers extends Parsers[BasicParser] {
   def regex(r: Regex): BasicParser[String] = BasicParser {
     (loc: Location) =>
       r.findPrefixOf(loc.input.substring(loc.offset)) match {
-        case None => Failure(loc.toError("regex: $r"), true)
+        case None => Failure(loc.toError("regex " + r), false)
         case Some(s) => Success(s, s.length)
       }
   }

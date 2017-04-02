@@ -2,14 +2,14 @@ package fpinscala.chapter9
 
 import language.higherKinds
 
-import fpinscala.chapter8.{Gen, Prop}
+import fpinscala.chapter8.{Gen, Prop, SGen}
 import fpinscala.chapter8.Gen._
 import fpinscala.chapter8.Prop._
 
 import scala.util.matching.Regex
 import java.util.regex._
 
-trait Parsers[ParserError, Parser[+_]] { self =>
+trait Parsers[Parser[+_]] { self =>
   def run[A](p: Parser[A])(input: String): Either[ParserError, A]
 
   implicit def string(s: String): Parser[String]
@@ -37,7 +37,9 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def map[A, B](pa: Parser[A])(f: A => B): Parser[B] =
     flatMap(pa)(a => succeed(f(a)))
 
-  def succeed[A](a: A): Parser[A] =
+  def succeed[A](a: A): Parser[A]
+
+  def defaultSucceed[A](a: A): Parser[A] =
     string("") map (_ => a)
 
   // Exercise 9.1
@@ -75,7 +77,7 @@ trait Parsers[ParserError, Parser[+_]] { self =>
 
   def quoted: Parser[String] = string("\"") >> consumeUntil("\"").map(_.dropRight(1))
 
-  def escapedQuoted: Parser[String] = token(quoted)
+  def escapedQuoted: Parser[String] = token(quoted) // TODO: This should actually handle escaped strings as well
 
   def doubleString: Parser[String] = token("[+-]?([0-9]*\\.)?[0-9]+([eE][+-]?[0-9]+)?".r)
 
@@ -93,6 +95,18 @@ trait Parsers[ParserError, Parser[+_]] { self =>
   def eof: Parser[String] = "\\z".r
 
   def root[A](p: Parser[A]) = p << eof
+
+  def label[A](msg: String)(p: Parser[A]): Parser[A]
+
+  def scope[A](msg: String)(p: Parser[A]): Parser[A]
+
+  def attempt[A](p: Parser[A]): Parser[A]
+
+  //def errorLocation(e: ParserError): Location
+  def errorMessage(e: ParserError): String = ???
+
+  //def furthest[A](p: Parser[A]): Parser[A]
+  //def latest[A](p: Parser[A]): Parser[A]
 
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
@@ -118,6 +132,9 @@ trait Parsers[ParserError, Parser[+_]] { self =>
     def separated1[B](p2: Parser[B]): Parser[List[A]] = self.separated1(p, p2)
     def separatedBy[B](p2: Parser[B]): Parser[List[A]] = self.separated(p, p2)
     def as[B](b: B): Parser[B] = self.map(self.slice(p))(_ => b)
+
+    def label(msg: String): Parser[A] = self.label(msg)(p)
+    def scope(msg: String): Parser[A] = self.scope(msg)(p)
   }
 
   object Laws {
@@ -164,7 +181,38 @@ trait Parsers[ParserError, Parser[+_]] { self =>
       val n = digits.toInt
       _ <- listOfN(n, char('a'))
     } yield n
+
+    def labelLaw[A](p: Parser[A], inputs: SGen[String]): Prop =
+      forAll(inputs ** Gen.string) { case (input, msg) =>
+        run(label(msg)(p))(input) match {
+          case Left(e) => errorMessage(e) == msg
+          case _ => true
+        }
+      }
   }
 }
 
-case class ParserError(msg: String)
+case class Location(input: String, offset: Int = 0) {
+  lazy val line = input.slice(0, offset + 1).count(_ == '\n') + 1
+  lazy val col = input.slice(0, offset + 1).lastIndexOf('\n') match {
+    case -1 => offset + 1
+    case lineStart => offset - lineStart
+  }
+
+  def toError(msg: String): ParserError =
+    ParserError(List((this, msg)))
+}
+
+case class ParserError(stack: List[(Location, String)]) {
+  def push(loc: Location, msg: String): ParserError =
+    copy(stack = (loc, msg) :: stack)
+
+  def label(s: String): ParserError =
+    ParserError(latestLocation.map((_, s)).toList)
+
+  def latestLocation: Option[Location] =
+    latest map (_._1)
+
+  def latest: Option[(Location, String)] =
+    stack lastOption
+}

@@ -13,7 +13,7 @@ object JSON {
   case class JObject(get: Map[String, JSON]) extends JSON
   
   // Exercise 9.9
-  def jsonParser[Error, Parser[+_]](P: Parsers[Error, Parser]): Parser[JSON] = {
+  def jsonParser[Parser[+_]](P: Parsers[Parser]): Parser[JSON] = {
     import P._
 
     val spaces = char(' ').many.slice
@@ -48,18 +48,18 @@ object JSON {
     jarray or jobject
   }
 
-  def jsonParser2[Error, Parser[+_]](P: Parsers[Error, Parser]): Parser[JSON] = {
+  def jsonParser2[Parser[+_]](P: Parsers[Parser]): Parser[JSON] = {
     import P.{string => _, _}
 
     implicit def t(s: String): Parser[String] = token(P.string(s))
     def jarray: Parser[JSON] = surround("[", "]"){
-      jvalue separatedBy "," map (vs => JArray(vs.toIndexedSeq))
+      jvalue separatedBy "," map (vs => JArray(vs.toIndexedSeq)) scope "array"
     }
     def jKeyVal: Parser[(String, JSON)] = escapedQuoted ** (":" >> jvalue)
     def jobject: Parser[JSON] = surround("{", "}"){
-      jKeyVal separatedBy "," map (kvs => JObject(kvs.toMap))
+      jKeyVal separatedBy "," map (kvs => JObject(kvs.toMap)) scope "object"
     }
-    def jliteral: Parser[JSON] = {
+    def jliteral: Parser[JSON] = scope("literal") {
       "null".as(JNull) |
       double.map(JNumber(_)) |
       escapedQuoted.map(JString(_)) |

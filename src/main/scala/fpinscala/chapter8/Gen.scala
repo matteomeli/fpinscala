@@ -218,6 +218,14 @@ object Gen {
 
     Gen(State(RNG.double)).flatMap(d => if (d < g1Threshold) g1._1 else g2._1)
   }
+
+  def listOf[A](g: Gen[A]): SGen[List[A]] =
+    SGen(n => g.listOfN(n))
+
+  def stringN(n: Int): Gen[String] =
+    listOfN(n, Gen.choose(0, 127)).map(_.map(_.toChar).mkString)
+
+  def string: SGen[String] = SGen(stringN)
 }
 
 case class SGen[+A](g: Int => Gen[A]) {

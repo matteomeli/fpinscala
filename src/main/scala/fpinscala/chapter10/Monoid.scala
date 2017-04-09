@@ -76,6 +76,20 @@ object MonoidLaws {
     } yield (x, y, z)) { case (a, b, c) => m.op(m.op(a, b), c) == m.op(a, m.op(b, c)) } // Associativity
   }
 
+  def concatenate[A](as: List[A])(m: Monoid[A]): A =
+    as.foldLeft(m.zero)(m.op)
+
+  // Exercise 10.5
+  def foldMap[A, B](as: List[A], m: Monoid[B])(f: A => B): B =
+    as.foldLeft(m.zero)((b, a) => m.op(b, f(a)))
+
+  // Exercise 10.6
+  def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
+    foldMap(as, endoMonoid[B])(f.curried)(z)
+
+  def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
+    foldMap(as, dualEndoMonoid[B])(a => b => f(b, a))(z)
+
   def main(args: Array[String]): Unit = {
     // Test some of the monoids...
     run(monoidLaws(stringMonoid, Gen.stringN(5)))

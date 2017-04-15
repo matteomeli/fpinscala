@@ -96,6 +96,9 @@ object Par {
     sequence(fbs)
   }
 
+  def parMap[A, B](v: IndexedSeq[A])(f: A => B): Par[IndexedSeq[B]] =
+    sequenceBalanced(v.map(asyncF(f)))
+
   // Exercise 7.6
   def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] = {
     val fbs: List[Par[(A, Boolean)]] = as.map(asyncF(a => (a, f(a))))

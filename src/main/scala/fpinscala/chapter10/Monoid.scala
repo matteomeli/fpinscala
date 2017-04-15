@@ -90,11 +90,33 @@ object MonoidLaws {
   def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
     foldMap(as, dualEndoMonoid[B])(a => b => f(b, a))(z)
 
+  // Exercise 10.7
+  def foldMapV[A, B](v: IndexedSeq[A], m: Monoid[B])(f: A => B): B =
+    if (v.length == 0) m.zero
+    else if (v.length == 1) f(v(0))
+    else {
+      val (left, right) = v.splitAt(v.length / 2)
+      m.op(foldMapV(left, m)(f), foldMapV(right, m)(f))
+    }
+
+  // Exercise 10.8
+  import fpinscala.chapter7.Par._
+  def par[A](m: Monoid[A]): Monoid[Par[A]] = new Monoid[Par[A]] {
+    def op(p1: Par[A], p2: Par[A]): Par[A] = map2(p1, p2)(m.op)
+    def zero: Par[A] = unit(m.zero)
+  }
+
+  def parFoldMap[A, B](v: IndexedSeq[A], m: Monoid[B])(f: A => B): Par[B] = {
+    flatMap(parMap(v)(f)) { bs =>
+      foldMapV(bs, par(m))(b => lazyUnit(b))
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     // Test some of the monoids...
-    run(monoidLaws(stringMonoid, Gen.stringN(5)))
-    run(monoidLaws(listMonoid[Int], Gen.listOfN(10, Gen.choose(0, 10))))
-    run(monoidLaws(intAddition, Gen.choose(0, 10)))
-    run(monoidLaws(intMultiplication, Gen.choose(0, 10)))
+    Prop.run(monoidLaws(stringMonoid, Gen.stringN(5)))
+    Prop.run(monoidLaws(listMonoid[Int], Gen.listOfN(10, Gen.choose(0, 10))))
+    Prop.run(monoidLaws(intAddition, Gen.choose(0, 10)))
+    Prop.run(monoidLaws(intMultiplication, Gen.choose(0, 10)))
   }
 }

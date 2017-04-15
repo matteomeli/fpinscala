@@ -112,11 +112,34 @@ object MonoidLaws {
     }
   }
 
+  // Exercise 10.9
+  def ordered(ints: IndexedSeq[Int]): Boolean = {
+    val mon = new Monoid[Option[((Int, Int, Boolean), (Int, Int, Boolean))]] {
+      def op(o1: Option[((Int, Int, Boolean), (Int, Int, Boolean))], o2: Option[((Int, Int, Boolean), (Int, Int, Boolean))]):
+      Option[((Int, Int, Boolean), (Int, Int, Boolean))] = {
+        (o1, o2) match {
+          case (Some(((x1, y1, p), (u1, v1, r))), Some(((x2, y2, q), (u2, v2, s)))) => 
+            Some(((x1 min x2, y1 max y2, p && q && y1 <= x2), (u1 max u2, v1 min v2, r && s && v1 >= u2)))
+          case (x, None) => x
+          case (None, x) => x
+        }
+      }
+      def zero: Option[((Int, Int, Boolean), (Int, Int, Boolean))] = None
+    }
+    foldMapV(ints, mon)(i => Some((i, i, true), (i, i, true))).map { case (asc, desc) => asc._3 || desc._3 }.getOrElse(true)
+  }
+
   def main(args: Array[String]): Unit = {
     // Test some of the monoids...
     Prop.run(monoidLaws(stringMonoid, Gen.stringN(5)))
     Prop.run(monoidLaws(listMonoid[Int], Gen.listOfN(10, Gen.choose(0, 10))))
     Prop.run(monoidLaws(intAddition, Gen.choose(0, 10)))
     Prop.run(monoidLaws(intMultiplication, Gen.choose(0, 10)))
+
+    println(ordered(Vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))) // == true (ascending)
+    println(ordered(Vector(9, 8, 7, 6, 5, 4, 3, 2, 1, 0))) // == true (descending)
+    println(ordered(Vector(1, 1, 1)))    // == true
+    println(ordered(Vector(1, 1, 2, 2))) // == true
+    println(ordered(Vector(1, 3, 2, 4))) // == false
   }
 }

@@ -3,6 +3,8 @@ package fpinscala.chapter10
 import fpinscala.chapter8.{Gen, Prop}
 import Prop._
 
+import language.higherKinds
+
 trait Monoid[A] {
   def op(a1: A, a2: A): A
   def zero: A
@@ -156,6 +158,120 @@ object MonoidLaws {
         case Stub(s) => s.length min 1
         case Part(l, w, r) => l.length min 1 + w + r.length min 1
     }
+  }
+
+  // Exercise 10.12
+  trait Foldable[F[_]] {
+    def foldRight[A, B](as: F[A])(z: B)(f: (A, B) => B): B =
+      foldMap(as)(f.curried)(endoMonoid[B])(z)
+
+    def foldLeft[A, B](as: F[A])(z: B)(f: (B, A) => B): B =
+      foldMap(as)(a => (b: B) => f(b, a))(dualEndoMonoid[B])(z)
+
+    def foldMap[A, B](as: F[A])(f: A => B)(mb: Monoid[B]): B =
+      foldRight(as)(mb.zero)((a, b) => mb.op(f(a), b))
+      //foldLeft(as)(mb.zero)((b, a) => mb.op(b, f(a)))
+
+    def concatenate[A](as: F[A])(m: Monoid[A]): A =
+      foldLeft(as)(m.zero)(m.op)
+
+    // Exercise 10.15
+    def toList[A](fa: F[A]): List[A] =
+      //foldMap(fa)(List(_))(listMonoid[A])
+      foldRight(fa)(List[A]())(_ :: _)
+  }
+
+  object ListFoldable extends Foldable[List] {
+    override def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
+      as.foldRight(z)(f)
+
+    override def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
+      as.foldLeft(z)(f)
+
+    override def foldMap[A, B](as: List[A])(f: A => B)(mb: Monoid[B]): B =
+      as.foldLeft(mb.zero)((b, a) => mb.op(b, f(a)))
+  }
+
+  object IndexedSeqFoldable extends Foldable[IndexedSeq] {
+    override def foldRight[A, B](as: IndexedSeq[A])(z: B)(f: (A, B) => B): B =
+      as.foldRight(z)(f)
+
+    override def foldLeft[A, B](as: IndexedSeq[A])(z: B)(f: (B, A) => B): B =
+      as.foldLeft(z)(f)
+
+    override def foldMap[A, B](as: IndexedSeq[A])(f: A => B)(mb: Monoid[B]): B =
+      foldMapV(as, mb)(f)
+  }
+
+  object StreamFoldable extends Foldable[Stream] {
+    override def foldRight[A, B](as: Stream[A])(z: B)(f: (A, B) => B): B =
+      as.foldRight(z)(f)
+
+    override def foldLeft[A, B](as: Stream[A])(z: B)(f: (B, A) => B): B =
+      as.foldLeft(z)(f)
+  }
+
+  // Exercise 10.13
+  import fpinscala.chapter3._
+  import fpinscala.chapter3.Tree._
+  object TreeFoldable extends Foldable[Tree] {
+    override def foldRight[A, B](as: Tree[A])(z: B)(f: (A, B) => B): B =
+      as match {
+        case Leaf(a) => f(a, z)
+        case Branch(l, r) => foldRight(l)(foldRight(r)(z)(f))(f)
+      }
+
+    override def foldLeft[A, B](as: Tree[A])(z: B)(f: (B, A) => B): B =
+      as match {
+        case Leaf(a) => f(z, a)
+        case Branch(l, r) => foldLeft(r)(foldLeft(l)(z)(f))(f)
+      }
+
+    // No need to use mb.zero in the definition
+    // Some types are foldable with something smaller than a monoid
+    // A `monoid` without zero is a `semigroup`
+    // Using fold defined in Tree companion object
+    override def foldMap[A, B](as: Tree[A])(f: A => B)(mb: Monoid[B]): B =
+      fold(as)(f)(mb.op(_, _))
+  }
+
+  // Exercise 10.14
+  object OptionFoldable extends Foldable[Option] {
+    override def foldRight[A, B](oa: Option[A])(z: B)(f: (A, B) => B): B =
+      oa.map(f(_, z)).getOrElse(z)
+
+    override def foldLeft[A, B](oa: Option[A])(z: B)(f: (B, A) => B): B =
+      oa.map(f(z, _)).getOrElse(z)
+
+    override def foldMap[A, B](oa: Option[A])(f: A => B)(mb: Monoid[B]): B =
+      oa.map(f).getOrElse(mb.zero)
+  }
+
+  // Exercise 10.16
+  def productMonoid[A, B](ma: Monoid[A], mb: Monoid[B]): Monoid[(A, B)] = new Monoid[(A, B)] {
+    def op(a1: (A, B), a2: (A, B)): (A, B) = (ma.op(a1._1, a2._1), mb.op(a1._2, a2._2))
+    def zero: (A, B) = (ma.zero, mb.zero)
+  }
+
+  // Exercise 10.17
+  def functionMonoid[A, B](m: Monoid[B]): Monoid[A => B] = new Monoid[A => B] {
+    def op(f1: A => B, f2: A => B): A => B = a => m.op(f1(a), f2(a))
+    def zero: A => B = a => m.zero
+  }
+
+  // Exercise 10.18
+  def mapMergeMonoid[K, V](mv: Monoid[V]): Monoid[Map[K, V]] =
+    new Monoid[Map[K, V]] {
+      def zero = Map[K,V]()
+      def op(a: Map[K, V], b: Map[K, V]) =
+        (a.keySet ++ b.keySet).foldLeft(zero) { (acc,k) =>
+          acc.updated(k, mv.op(a.getOrElse(k, mv.zero), b.getOrElse(k, mv.zero)))
+        }
+    }
+
+  def bag[A](as: IndexedSeq[A]): Map[A, Int] = {
+    val M: Monoid[Map[A, Int]] = mapMergeMonoid(intAddition)
+    IndexedSeqFoldable.foldMap(as)(a => Map(a -> 1))(M)
   }
 
   def main(args: Array[String]): Unit = {

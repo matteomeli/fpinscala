@@ -129,6 +129,35 @@ object MonoidLaws {
     foldMapV(ints, mon)(i => Some((i, i, true), (i, i, true))).map { case (asc, desc) => asc._3 || desc._3 }.getOrElse(true)
   }
 
+  // Exercise 10.10
+  sealed trait WordCount
+  case class Stub(chars: String) extends WordCount
+  case class Part(lStub: String, words: Int, rStub: String) extends WordCount
+
+  val wcMonoid: Monoid[WordCount] = new Monoid[WordCount] {
+    def op(w1: WordCount, w2: WordCount): WordCount = {
+      (w1, w2) match {
+        case (Stub(a), Stub(b)) => Stub(a + b)
+        case (Stub(a), Part(l, w, r)) => Part(a + l, w, r)
+        case (Part(l, w, r), Stub(b)) => Part(l, w, r + b)
+        case (Part(l1, w1, r1), Part(l2, w2, r2)) => 
+          Part(l1, w1 + w2 + (if ((r1 + l2).isEmpty) 0 else 1), r2)
+      }
+    }
+    def zero: WordCount = Stub("")
+  }
+
+  // Exercise 10.11
+  def wordCount(s: String): Int = {
+    foldMapV(s.toIndexedSeq, wcMonoid) { c =>
+        if (c.isWhitespace) Part("", 0, "")
+        else Stub(c.toString)
+      } match {
+        case Stub(s) => s.length min 1
+        case Part(l, w, r) => l.length min 1 + w + r.length min 1
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     // Test some of the monoids...
     Prop.run(monoidLaws(stringMonoid, Gen.stringN(5)))

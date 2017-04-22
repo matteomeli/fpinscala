@@ -1,6 +1,8 @@
 package fpinscala.chapter9
 
 import language.higherKinds
+import language.implicitConversions
+import language.postfixOps
 
 import fpinscala.chapter8.{Gen, Prop, SGen}
 import fpinscala.chapter8.Gen._
@@ -37,7 +39,7 @@ trait Parsers[Parser[+_]] { self =>
   def map[A, B](pa: Parser[A])(f: A => B): Parser[B] =
     flatMap(pa)(a => succeed(f(a)))
 
-  def succeed[A](a: A): Parser[A]
+  def succeed[A](a: => A): Parser[A]
 
   def defaultSucceed[A](a: A): Parser[A] =
     string("") map (_ => a)
@@ -178,7 +180,7 @@ trait Parsers[Parser[+_]] { self =>
     val nAs: Parser[Int] = regex("[0-9]+".r).flatMap(m => listOfN(m.toInt, char('a'))).map(_.size)
     val nAs2: Parser[Int] = for {
       digits <- "[0-9]+".r
-      val n = digits.toInt
+      n = digits.toInt
       _ <- listOfN(n, char('a'))
     } yield n
 

@@ -60,7 +60,7 @@ object BasicParsers extends Parsers[BasicParser] {
       }
   }
 
-  def succeed[A](a: A): BasicParser[A] = BasicParser {
+  def succeed[A](a: => A): BasicParser[A] = BasicParser {
     (loc: Location) => Success(a, 0)
   }
 

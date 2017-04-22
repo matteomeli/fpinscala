@@ -13,7 +13,7 @@ object Par {
     def cancel(evenIFRunning: Boolean) = false
   }
 
-  def unit[A](a: A): Par[A] = es => UnitFuture(a)
+  def unit[A](a: => A): Par[A] = es => UnitFuture(a)
 
   // Exercise 7.1
   def map2[A, B, C](a: Par[A], b: Par[B])(f: (A, B) => C): Par[C] = es => {

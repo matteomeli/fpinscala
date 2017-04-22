@@ -48,11 +48,30 @@ trait Monad[F[_]] extends Functor[F] {
   def replicateM[A](n: Int, ma: F[A]): F[List[A]] =
     sequence(List.fill(n)(ma))
 
+  // Exercise 11.5
+  /*
+   * For `List`, the `replicateM` function will generate a list of lists.
+   * It will contain all the lists of length `n` with elements selected from the input list.
+   * For `Option`, it will generate either `Some` or `None` based on whether the input is `Some` 
+   * or `None`. The `Some` case will contain a list of length `n` that repeats the element in the 
+   * input `Option`.
+   * 
+   * The general meaning of `replicateM` is described well by the implementation 
+   * `sequence (List.fill(n)(ma))`. It repeats the `ma` monadic value `n` times and gathers the 
+   * results in a single value, where the monad `F` determines how values are actually combined.
+   */
+
   def product[A, B](ma: F[A], mb: F[B]): F[(A, B)] =
     map2(ma, mb)((_, _))
 
+  // Exercise 11.6
   def filterM[A](as: List[A])(f: A => F[Boolean]): F[List[A]] =
-    as.foldRight(unit(List[A]()))((a, fal) => flatMap(f(a))(p => if (p) map2(unit(a), fal)(_ :: _) else fal))
+    as.foldRight(unit(List[A]())) { (a, fal) => 
+      flatMap(f(a)) { p => 
+        if (p) map2(unit(a), fal)(_ :: _) 
+        else fal
+      }
+    }
 
   /*
    * For `Par`, `filterM` filters a list, applying the functions in
@@ -69,6 +88,25 @@ trait Monad[F[_]] extends Functor[F] {
         if (!b) filterM(t)(f)
         else map(filterM(t)(f))(h :: _))
     }
+
+  // Exercise 11.7
+  def compose[A, B, C](f: A => F[B], g: B => F[C]): A => F[C] =
+    a => flatMap(f(a))(g)
+
+  // Exercise 11.8
+  def flatMap2[A, B](ma: F[A])(f: A => F[B]): F[B] =
+    compose((_: Unit) => ma, f)(())
+
+  // Exercise 11.12
+  def join[A](mma: F[F[A]]): F[A] =
+    flatMap(mma)(identity)
+
+  // Exercise 11.13
+  def flatMap3[A, B](ma: F[A])(f: A => F[B]): F[B] =
+    join(map(ma)(f))
+
+  def compose2[A, B, C](f: A => F[B], g: B => F[C]): A => F[C] =
+    a => join(map(f(a))(g))
 }
 
 object Monad {
@@ -125,6 +163,17 @@ object Monad {
     def flatMap[A, B](sa: State[S, A])(f: A => State[S, B]): State[S, B] =
       sa flatMap f
   }
+}
 
-  //
+// Exercise 11.17
+case class Id[A](value: A) {
+  def map[B](f: A => B): Id[B] = Id(f(value))
+  def flatMap[B](f: A => Id[B]): Id[B] = f(value)
+}
+
+object Id {
+  val idMonad: Monad[Id] = new Monad[Id] {
+    def unit[A](a: => A): Id[A] = Id(a)
+    def flatMap[A, B](ia: Id[A])(f: A => Id[B]): Id[B] = ia flatMap f
+  }
 }

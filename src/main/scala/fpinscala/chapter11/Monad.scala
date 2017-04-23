@@ -12,6 +12,8 @@ import fpinscala.chapter6.State._
 trait Functor[F[_]] {
   def map[A, B](fa: F[A])(f: A => B): F[B]
 
+  def compose[A, B, C](fa: F[A])(f: A => B, g: B => C): F[C] = map(fa)(g compose f) // == map(fa)(f andThen g) == map(map(fa)(f))(g)
+
   def distribute[A, B](fab: F[(A, B)]): (F[A], F[B]) =
     (map(fab)(_._1), map(fab)(_._2))
 
@@ -198,7 +200,7 @@ object Id {
  * You can *get* but not *set* the `R` value that `flatMap` carries along.
  */
 case class Reader[R, A](run: R => A) {
-  def map[B](f: A => B): Reader[R, B] = Reader(r => f(run(r)))
+  def map[B](f: A => B): Reader[R, B] = Reader(r => f(run(r)))  // == Reader(run andThen f) == Reader(f compose run)
 
   // The action of Reader's `flatMap` is to pass the `r` argument along to both the
   // outer Reader and also to the result of `f`, the inner Reader. Similar to how

@@ -1,6 +1,7 @@
 package fpinscala.chapter9
 
 import language.higherKinds
+import language.implicitConversions
 
 trait JSON
 

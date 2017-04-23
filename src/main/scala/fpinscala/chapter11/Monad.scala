@@ -7,6 +7,7 @@ import fpinscala.chapter7.Par._
 import fpinscala.chapter9._
 import fpinscala.chapter4._
 import fpinscala.chapter6._
+import fpinscala.chapter6.State._
 
 trait Functor[F[_]] {
   def map[A, B](fa: F[A])(f: A => B): F[B]
@@ -144,8 +145,6 @@ object Monad {
     def flatMap[A, B](as: List[A])(f: A => List[B]): List[B] = as flatMap f
   }
 
-  //val eitherMonad: Monad[Either] = ???
-
   // Exercise 11.2
   //type StateS[A] = State[_, A]
   class StateMonads[S] {
@@ -163,6 +162,21 @@ object Monad {
     def flatMap[A, B](sa: State[S, A])(f: A => State[S, B]): State[S, B] =
       sa flatMap f
   }
+
+  val F = stateMonad[Int]
+  def zipWithIndex[A](as: List[A]): List[(Int, A)] =
+    as.foldLeft(F.unit(List[(Int, A)]()))((acc, a) => for {
+      xs <- acc
+      n <- get
+      _ <- set(n + 1)
+    } yield (n, a) :: xs).run(0)._1.reverse
+
+  def zipWithIndex2[A](as: List[A]): List[(Int, A)] =
+    as.foldLeft(F.unit(List[(Int, A)]()))((acc, a) =>
+      acc.flatMap(xs => 
+        get.flatMap(n => 
+          set(n + 1).map(_ => 
+            (n, a) :: xs)))).run(0)._1.reverse
 }
 
 // Exercise 11.17
@@ -175,5 +189,43 @@ object Id {
   val idMonad: Monad[Id] = new Monad[Id] {
     def unit[A](a: => A): Id[A] = Id(a)
     def flatMap[A, B](ia: Id[A])(f: A => Id[B]): Id[B] = ia flatMap f
+  }
+}
+
+// Exercise 11.20
+/*
+ * This monad is very similar to the `State` monad, except that it's *read-only*. 
+ * You can *get* but not *set* the `R` value that `flatMap` carries along.
+ */
+case class Reader[R, A](run: R => A) {
+  def map[B](f: A => B): Reader[R, B] = Reader(r => f(run(r)))
+
+  // The action of Reader's `flatMap` is to pass the `r` argument along to both the
+  // outer Reader and also to the result of `f`, the inner Reader. Similar to how
+  // `State` passes along a state, except that in `Reader` the "state" is read-only.
+  def flatMap[B](f: A => Reader[R, B]): Reader[R, B] = Reader(r => f(run(r)).run(r))
+
+  // The meaning of `sequence` here is that if you have a list of functions, you can
+  // turn it into a function that takes one argument and passes it to all the functions
+  // in the list, returning a list of the results.
+
+  // The meaning of `join` is simply to pass the same value as both arguments to a
+  // binary function.
+
+  // The meaning of `replicateM` is to apply the same function a number of times to
+  // the same argument, returning a list of the results. Note that if this function
+  // is _pure_, (which it should be), this can be exploited by only applying the
+  // function once and replicating the result instead of calling the function many times.
+  // This means the Reader monad can override replicateM to provide a very efficient
+  // implementation.
+}
+
+object Reader {
+  // The primitive operation for Reader is then to `read` the `R` argument
+  def read[R]: Reader[R, R] = Reader(r => r)
+
+  def readerMonad[R] = new Monad[({type f[x] = Reader[R, x]})#f] {
+    def unit[A](a: => A): Reader[R, A] = Reader(_ => a)
+    def flatMap[A, B](ra: Reader[R, A])(f: A => Reader[R, B]): Reader[R, B] = ra flatMap f
   }
 }

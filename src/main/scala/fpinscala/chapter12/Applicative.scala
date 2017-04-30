@@ -271,3 +271,27 @@ case class OptionT[M[_], A](value: M[Option[A]])(implicit M: Monad[M]) {
     })
   }
 }
+
+case class StateT[M[_], S, A](run: S => M[(A, S)])(implicit M: Monad[M]) {
+  def unit(a: => A): StateT[M, S, A] = StateT(s => M.unit((a, s)))
+  def flatMap[B](f: A => StateT[M, S, B]): StateT[M, S, B] = StateT(
+    s => M.flatMap(run(s)) { case (a, s1) => f(a).run(s1) }
+  )
+}
+
+object StateT {
+  def get[M[_], S](implicit M: Monad[M]): StateT[M, S, S] = StateT(s => M.unit((s, s)))
+  def set[M[_], S](s: S)(implicit M: Monad[M]): StateT[M, S, Unit] = StateT(_ => M.unit(((), s)))
+
+  type Id[A] = A
+
+  val idMonad = new Monad[Id] {
+    def unit[A](a: => A): Id[A] = a
+    override def flatMap[A, B](ia: Id[A])(f: A => Id[B]): Id[B] = f(ia)
+  }
+
+  // Redefine State in terms of StateT
+  type State[S, A] = StateT[Id, S, A]
+}
+
+// TODO: Implement ReaderT, WriterT and other monad transformers

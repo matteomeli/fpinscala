@@ -1,7 +1,7 @@
 package fpinscala.chapter12
 
 import language.higherKinds
-import scala.language.implicitConversions
+import language.implicitConversions
 
 import fpinscala.chapter11.Functor
 import fpinscala.chapter10.Monoid
@@ -278,7 +278,7 @@ case class StateT[M[_], S, A](run: S => M[(A, S)])(implicit M: Monad[M]) {
     s => M.flatMap(run(s)) { case (a, s1) => f(a).run(s1) }
   )
 }
-
+  
 object StateT {
   def get[M[_], S](implicit M: Monad[M]): StateT[M, S, S] = StateT(s => M.unit((s, s)))
   def set[M[_], S](s: S)(implicit M: Monad[M]): StateT[M, S, Unit] = StateT(_ => M.unit(((), s)))

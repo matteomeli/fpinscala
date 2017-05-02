@@ -50,4 +50,15 @@ object Nonblocking {
         p2(es)(b => combiner ! Right(b))
       }
     }
+
+  def async[A](run: (A => Unit) => Unit): Par[A] = es =>
+    new Future[A] {
+      def apply(k: A => Unit) = run(k)
+    }
+
+  def delay[A](a: => A): Par[A] =
+    es => new Future[A] {
+      def apply(cb: A => Unit): Unit =
+        cb(a)
+    }
 }

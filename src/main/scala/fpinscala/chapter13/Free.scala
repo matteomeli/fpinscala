@@ -118,4 +118,38 @@ object Free {
   }
   def runConsole[A](a: Free[Console, A]): A =
     runTrampoline(translate(a)(consoleToFunction0))
+
+  // Exercise 13.5
+  import fpinscala.chapter7.Nonblocking._
+  import fpinscala.chapter7.Nonblocking.Par
+  import java.nio._
+  import java.nio.channels._
+
+  type IO[A] = Free[Par, A]
+
+  // Provides the syntax `Async { k => ... }` for asyncronous IO blocks.
+  def Async[A](cb: (A => Unit) => Unit): IO[A] =
+    Suspend { async(cb) }
+
+  // Provides the `IO { ... }` syntax for synchronous IO blocks.
+  def IO[A](a: => A): IO[A] = Suspend { delay(a) }
+
+  def read(file: AsynchronousFileChannel, fromPosition: Long, numBytes: Int): Par[Either[Throwable, Array[Byte]]] = {
+    async {
+      (cb: Either[Throwable, Array[Byte]] => Unit) => {
+        val buffer = ByteBuffer.allocate(numBytes)
+        file.read(buffer, fromPosition, (), new CompletionHandler[Integer, Unit]{
+          def completed(bytesRead: Integer, u: Unit): Unit = {
+            val array = new Array[Byte](bytesRead)
+            buffer.slice.get(array, 0, bytesRead)
+            cb(Right(array))
+          }
+
+          def failed(e: Throwable, u: Unit): Unit = {
+            cb(Left(e))
+          }
+        })
+      }
+    }
+  }
 }

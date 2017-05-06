@@ -174,3 +174,28 @@ object STArray {
       } yield sorted
     })
 }
+
+// Exercise 14.3
+sealed abstract class STHashMap[S, K, V] {
+  protected def table: scala.collection.mutable.HashMap[K, V]
+
+  def size: ST[S, Int] = ST(table.size)
+
+  def +=(kv: (K, V)): ST[S, Unit] = ST(table += kv)
+
+  def -=(k: K): ST[S, Unit] = ST(table -= k)
+
+  def get(k: K): ST[S, Option[V]] = ST(table get k)
+
+  def apply(k: K): ST[S, V] = ST(table apply k)
+}
+
+object STHashMap {
+  def empty[S, K, V]: ST[S, STHashMap[S, K, V]] = ST(new STHashMap[S, K, V] {
+    lazy val table = scala.collection.mutable.HashMap.empty[K, V]
+  })
+
+  def fromMap[S, K, V](m: Map[K, V]): ST[S, STHashMap[S, K, V]] = ST(new STHashMap[S, K, V] {
+    lazy val table = (scala.collection.mutable.HashMap.newBuilder[K, V] ++= m).result
+  })
+}

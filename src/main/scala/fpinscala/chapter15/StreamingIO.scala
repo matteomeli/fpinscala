@@ -1,6 +1,8 @@
 package fpinscala.chapter15
 
 import fpinscala.chapter13.Free._
+import fpinscala.chapter11._
+import fpinscala.chapter11.Monad._
 
 object ImperativeIO {
   /**
@@ -70,6 +72,8 @@ object ImperativeIO {
 }
 
 sealed trait Process[I, O] {
+  import Process._
+
   def apply(s: Stream[I]): Stream[O] = this match {
     case Halt() => Stream()
     case Await(recv) => s match {
@@ -89,6 +93,41 @@ sealed trait Process[I, O] {
       case Emit(h, t) => Emit(h, go(t))
     }
     go(this)
+  }
+
+  // Exercise 15.5
+  def |>[O2](p2: Process[O, O2]): Process[I, O2] = p2 match {
+    case Halt() => Halt()
+    case Emit(h, t) => Emit(h, this |> t)
+    case Await(f) => this match {
+      case Emit(h, t) => t |> f(Some(h))
+      case Halt() => Halt() |> f(None)
+      case Await(g) => Await { g(_) |> p2 }
+    }
+  }
+
+  def map[O2](f: O => O2): Process[I, O2] = this |> lift(f)
+
+  def ++(p: => Process[I, O]): Process[I, O] = this match {
+    case Halt() => p
+    case Emit(h, t) => Emit(h, t ++ p)
+    case Await(recv) => Await { recv andThen (_ ++ p) }
+  }
+
+  def flatMap[O2](f: O => Process[I, O2]): Process[I, O2] = this match {
+    case Halt() => Halt()
+    case Emit(h, t) => f(h) ++ t.flatMap(f)
+    case Await(recv) => Await { recv andThen (_.flatMap(f)) }
+  }
+
+  // Exercise 15.6
+  def zipWithIndex: Process[I, (O, Int)] = {
+    def go(count: Int, p: Process[I, O]): Process[I, (O, Int)] = p match {
+      case Halt() => Halt()
+      case Emit(h, t) => Emit((h, count), go(count + 1, t))
+      case Await(recv) => Await { recv andThen (go(count, _)) }
+    }
+    go(0, this)
   }
 }
 
@@ -181,4 +220,42 @@ object Process {
   def sum1: Process[Double, Double] = loop(0.0) { (d, acc) => (d + acc, d + acc) }
 
   def count1[I]: Process[I, Int] = loop(0) { (_, acc) => (acc + 1, acc + 1) }
+
+  def monad[I]: Monad[({ type f[x] = Process[I, x]})#f] =
+    new Monad[({ type f[x] = Process[I, x]})#f] {
+      def unit[O](o: => O): Process[I, O] = Emit(o)
+
+      def flatMap[O, O2](p: Process[I, O])(f: O => Process[I, O2]): Process[I, O2] = p.flatMap(f)
+    }
+
+  // Exercise 15.7
+  def zip[I, A, B](p1: Process[I, A], p2: Process[I, B]): Process[I, (A, B)] = (p1, p2) match {
+    case (Halt(), _) => Halt()
+    case (_, Halt()) => Halt()
+    case (Emit(h1, t1), Emit(h2, t2)) => Emit((h1, h2), zip(t1, t2))
+    case (e @ Emit(_, _), Await(r2)) => Await { i => zip(e, r2(i)) }
+    case (Await(r1), e @ Emit(_, _)) => Await { i => zip(r1(i), e) }
+    case (Await(r1), Await(r2)) => Await { i => zip(r1(i), r2(i)) }
+  }
+
+  def mean1: Process[Double, Double] = zip[Double, Int, Double](count, sum) map { case (count, sum) => sum / count }
+
+  // Exercise 15.8
+  // V1: Halting and only yielding the final result
+  def exists[I](p: I => Boolean): Process[I, Boolean] = Await[I, Boolean] {
+    case Some(i) => if (p(i)) Emit(true) else exists(p)
+    case _ => Emit(false)
+  }
+
+  // V2: Halting at the first true and yielding all intermediate results
+  def exists1[I](p: I => Boolean): Process[I, Boolean] = Await[I, Boolean] {
+    case Some(i) => if (p(i)) Emit(true) else Emit(false, exists1(p))
+    case _ => Halt()
+  }
+
+  // V3: Not halting and yielding all intermadiate results
+  def exists2[I](p: I => Boolean): Process[I, Boolean] = Await[I, Boolean] {
+    case Some(i) => if (p(i)) Emit(true, exists2(_ => true)) else Emit(false, exists2(p))
+    case _ => Halt()
+  }
 }

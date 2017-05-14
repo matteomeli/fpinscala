@@ -129,6 +129,15 @@ sealed trait Process[I, O] {
     }
     go(0, this)
   }
+
+  def orElse(p: Process[I, O]): Process[I, O] = this match {
+    case Halt() => p
+    case Await(recv) => Await {
+      case None => p
+      case i => recv(i)
+    }
+    case _ => this
+  }
 }
 
 case class Emit[I, O](head: O, tail: Process[I, O] = Halt[I, O]()) extends Process[I, O]
@@ -258,4 +267,14 @@ object Process {
     case Some(i) => if (p(i)) Emit(true, exists2(_ => true)) else Emit(false, exists2(p))
     case _ => Halt()
   }
+
+  
+  def any: Process[Boolean, Boolean] = loop(false) { (b, s) => (b || s, b || s) }
+
+  def exists3[I](p: I => Boolean): Process[I, Boolean] = lift(p) |> any
+
+  def echo[I]: Process[I, I] = await(i => emit(i))
+  def takeThrough[I](p: I => Boolean): Process[I, I] = takeWhile(p) ++ echo
+
+  def exist4[I](p: I => Boolean): Process[I, Boolean] = exists3(p) |> takeThrough(!_) |> dropWhile(!_) |> echo.orElse(emit(false))
 }

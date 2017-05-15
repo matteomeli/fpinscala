@@ -277,4 +277,55 @@ object Process {
   def takeThrough[I](p: I => Boolean): Process[I, I] = takeWhile(p) ++ echo
 
   def exist4[I](p: I => Boolean): Process[I, Boolean] = exists3(p) |> takeThrough(!_) |> dropWhile(!_) |> echo.orElse(emit(false))
+
+  def processFile[A, B](f: java.io.File, p: Process[String, A], z: B)(g: (B, A) => B): IO[B] = IO {
+    @annotation.tailrec
+    def go(ss: Iterator[String], cur: Process[String, A], acc: B): B = cur match {
+      case Halt() => acc
+      case Await(recv) =>
+        val next = if (ss.hasNext) recv(Some(ss.next)) else recv(None)
+        go(ss, next, acc)
+      case Emit(h, t) => go(ss, t, g(acc, h))
+    }
+    val s = io.Source.fromFile(f)
+    try go(s.getLines, p, z)
+    finally s.close
+  }
+
+  val f: java.io.File = ???
+  val x: IO[Boolean] = processFile(f, count |> exists3(_ > 40000), false)(_ || _)
+
+  // Exercise 15.9
+  def toCelsius(fahrenheit: Double): Double = (5.0 / 9.0) * (fahrenheit - 32.0)
+  
+  def convertFarhenheit: Process[String, String] =
+    filter((line: String) => !line.startsWith("#")) |>
+    filter(line => line.trim.nonEmpty) |>
+    lift(line => toCelsius(line.toDouble).toString)
+
+  def processToFile(i: java.io.File, o: java.io.File, p: Process[String, String]): IO[Unit] = IO {
+    def go(ss: Iterator[String], w: java.io.PrintWriter, cur: Process[String, String]): Unit = cur match {
+      case Halt() => ()
+      case Await(recv) =>
+        val next = if (ss.hasNext) recv(Some(ss.next)) else recv(None)
+        go(ss, w, next)
+      case Emit(h, t) => {
+        w.write(h)
+        go(ss, w, t)
+      }
+    }
+    val is = io.Source.fromFile(i)
+    val w = new java.io.PrintWriter(o)
+    try {
+      go(is.getLines, w, p)
+    }
+    finally {
+      is.close
+      w.close
+    }
+  }
+
+  val i: java.io.File = ???
+  val o: java.io.File = ???
+  val y: IO[Unit] = processToFile(i, o, convertFarhenheit)
 }

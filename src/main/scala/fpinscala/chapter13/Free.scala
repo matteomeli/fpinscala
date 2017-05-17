@@ -46,9 +46,10 @@ object Free {
     case _ => sys.error("Impossible, since `step` eliminates these cases")
   }
 
-  import fpinscala.chapter7.Par
+  import fpinscala.chapter7.Nonblocking._
+  import fpinscala.chapter7.Nonblocking.Par
   sealed trait Console[A] {
-    def toPar: Par.Par[A]
+    def toPar: Par[A]
     def toThunk: () => A
   }
 
@@ -78,7 +79,7 @@ object Free {
   type ~>[F[_], G[_]] = Translate[F, G]
 
   val consoleToFunction0 = new (Console ~> Function0) { def apply[A](a: Console[A]) = a.toThunk }
-  val consoleToPar = new (Console ~> Par.Par) { def apply[A](a: Console[A]) = a.toPar }
+  val consoleToPar = new (Console ~> Par) { def apply[A](a: Console[A]) = a.toPar }
 
   def runFree[F[_], G[_], A](free: Free[F, A])(t: F ~> G)(implicit G: Monad[G]): G[A] = {
     step(free) match {
@@ -92,8 +93,8 @@ object Free {
   def runConsoleFunction0[A](a: Free[Console, A]): () => A =
     runFree[Console, Function0, A](a)(consoleToFunction0)(function0Monad)
 
-  def runConsoleToPar[A](a: Free[Console, A]): Par.Par[A] =
-    runFree[Console, Par.Par, A](a)(consoleToPar)(parMonad)
+  def runConsoleToPar[A](a: Free[Console, A]): Par[A] =
+    runFree[Console, Par, A](a)(consoleToPar)(parMonad)
 
   implicit val function0Monad = new Monad[Function0] {
     def unit[A](a: => A) = () => a
@@ -101,9 +102,9 @@ object Free {
       () => f(a())()
   }
 
-  implicit val parMonad = new Monad[Par.Par] {
+  implicit val parMonad = new Monad[Par] {
     def unit[A](a: => A) = Par.lazyUnit(a)
-    def flatMap[A, B](pa: Par.Par[A])(f: A => Par.Par[B]): Par.Par[B] =
+    def flatMap[A, B](pa: Par[A])(f: A => Par[B]): Par[B] =
       Par.fork { pa.flatMap(f) }
   }
 
@@ -120,8 +121,6 @@ object Free {
     runTrampoline(translate(a)(consoleToFunction0))
 
   // Exercise 13.5
-  import fpinscala.chapter7.Nonblocking._
-  import fpinscala.chapter7.Nonblocking.Par
   import java.nio._
   import java.nio.channels._
 
@@ -129,13 +128,13 @@ object Free {
 
   // Provides the syntax `Async { k => ... }` for asyncronous IO blocks.
   def Async[A](cb: (A => Unit) => Unit): IO[A] =
-    Suspend { async(cb) }
+    Suspend { Par.async(cb) }
 
   // Provides the `IO { ... }` syntax for synchronous IO blocks.
-  def IO[A](a: => A): IO[A] = Suspend { delay(a) }
+  def IO[A](a: => A): IO[A] = Suspend { Par.delay(a) }
 
   def read(file: AsynchronousFileChannel, fromPosition: Long, numBytes: Int): Par[Either[Throwable, Array[Byte]]] = {
-    async {
+    Par.async {
       (cb: Either[Throwable, Array[Byte]] => Unit) => {
         val buffer = ByteBuffer.allocate(numBytes)
         file.read(buffer, fromPosition, (), new CompletionHandler[Integer, Unit]{
@@ -152,4 +151,8 @@ object Free {
       }
     }
   }
+
+  import java.util.concurrent._
+  def unsafePerformIO[A](a: IO[A])(pool: ExecutorService): Unit =
+    Par.run(pool)(run(a)(parMonad))
 }

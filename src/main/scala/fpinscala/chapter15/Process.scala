@@ -48,6 +48,12 @@ trait ProcessF[F[_], O] {
       case x => recv(x)
     }
   }
+
+  def drain[O2]: ProcessF[F, O2] = this match {
+    case Halt(e) => Halt(e)
+    case Emit(_, t) => t.drain
+    case Await(req, recv) => Await(req, recv andThen (_.drain))
+  }
 }
 
 object ProcessF {
@@ -111,5 +117,13 @@ object ProcessF {
       case Left(t) => Halt(t)
       case Right(r) => use(r).onComplete(release(r))
     }
+  
+  // Exercise 15.11
+  def eval[F[_], A](a: F[A]): ProcessF[F, A] = await[F, A, A](a) {
+    case Left(t) => Halt(t)
+    case Right(a) => Emit(a, Halt(End))
+  }
+
+  def eval_[F[_], A, B](a: F[A]): ProcessF[F, B] = eval(a).drain[B]
 }
 

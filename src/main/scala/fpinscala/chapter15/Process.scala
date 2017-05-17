@@ -125,5 +125,24 @@ object ProcessF {
   }
 
   def eval_[F[_], A, B](a: F[A]): ProcessF[F, B] = eval(a).drain[B]
+
+  /*
+  * Create a `Process[IO,O]` from the lines of a file, using
+  * the `resource` combinator above to ensure the file is closed
+  * when processing the stream of lines is finished.
+  */
+  def lines(filename: String): ProcessF[IO, String] =
+    resource
+      { IO(io.Source.fromFile(filename)) }
+      { src =>
+          lazy val iter = src.getLines // a stateful iterator
+          def step = if (iter.hasNext) Some(iter.next) else None
+          lazy val lines: ProcessF[IO, String] = eval(IO(step)).flatMap {
+            case None => Halt(End)
+            case Some(line) => Emit(line, lines)
+          }
+          lines
+      }
+      { src => eval_ { IO(src.close) } }
 }
 
